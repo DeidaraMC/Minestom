@@ -85,7 +85,7 @@ public final class Worker extends MinestomThread {
                         MinecraftServer.getExceptionManager().handleException(t);
                         connection.disconnect();
                     }
-                }, MinecraftServer.TICK_MS);
+                }, 1);
             } catch (Exception e) {
                 MinecraftServer.getExceptionManager().handleException(e);
             }
