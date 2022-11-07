@@ -1,5 +1,6 @@
 package net.minestom.server.network.player;
 
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.translation.GlobalTranslator;
 import net.minestom.server.MinecraftServer;
 import net.minestom.server.adventure.MinestomAdventure;
@@ -84,6 +85,7 @@ public class PlayerSocketConnection extends PlayerConnection {
         this.remoteAddress = remoteAddress;
     }
 
+    private static long timeSinceLastProcess = System.currentTimeMillis();
     public void processPackets(BinaryBuffer readBuffer, PacketProcessor packetProcessor) {
         // Decrypt data
         {
@@ -100,6 +102,10 @@ public class PlayerSocketConnection extends PlayerConnection {
         }
         // Read all packets
         try {
+            MinecraftServer.getInstanceManager().getInstances().forEach(instance -> {
+                instance.sendMessage(Component.text((System.currentTimeMillis() - timeSinceLastProcess) + ""));
+            });
+            timeSinceLastProcess = System.currentTimeMillis();
             this.cacheBuffer = PacketUtils.readPackets(readBuffer, compressed,
                     (id, payload) -> {
                         if (!isOnline())
