@@ -1,5 +1,6 @@
 package net.minestom.server.network.socket;
 
+import net.kyori.adventure.text.Component;
 import net.minestom.server.MinecraftServer;
 import net.minestom.server.network.player.PlayerSocketConnection;
 import net.minestom.server.thread.MinestomThread;
@@ -40,11 +41,13 @@ public final class Worker extends MinestomThread {
         }
     }
 
+    public static int TEST_VARIABLE = 0;
     @Override
     public void run() {
         while (server.isOpen()) {
             try {
                 try {
+                    MinecraftServer.getInstanceManager().getInstances().forEach(i -> i.sendMessage(Component.text("Queue drain: " + (System.currentTimeMillis() - TEST_VARIABLE) + "ms")));
                     this.queue.drain(Runnable::run);
                 } catch (Exception e) {
                     MinecraftServer.getExceptionManager().handleException(e);
