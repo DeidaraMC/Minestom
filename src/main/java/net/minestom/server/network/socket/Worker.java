@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @ApiStatus.Internal
 public final class Worker extends MinestomThread {
+    private static final int PACKET_WORKER_TIMEOUT = Integer.getInteger("minestom.packet-worker-timeout", MinecraftServer.TICK_MS);
+
     private static final AtomicInteger COUNTER = new AtomicInteger();
 
     final Selector selector;
@@ -85,7 +87,7 @@ public final class Worker extends MinestomThread {
                         MinecraftServer.getExceptionManager().handleException(t);
                         connection.disconnect();
                     }
-                }, 1);
+                }, PACKET_WORKER_TIMEOUT); //MinecraftServer.TICK_MS
             } catch (Exception e) {
                 MinecraftServer.getExceptionManager().handleException(e);
             }
