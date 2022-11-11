@@ -41,13 +41,16 @@ public final class Worker extends MinestomThread {
         }
     }
 
-    public static int TEST_VARIABLE = 0;
+    public static long TEST_VARIABLE = 0;
     @Override
     public void run() {
         while (server.isOpen()) {
             try {
                 try {
-                    MinecraftServer.getInstanceManager().getInstances().forEach(i -> i.sendMessage(Component.text("Queue drain: " + (System.currentTimeMillis() - TEST_VARIABLE) + "ms")));
+                    if (TEST_VARIABLE != 0) {
+                        MinecraftServer.getInstanceManager().getInstances().forEach(i -> i.sendMessage(Component.text("Queue drain: " + (System.currentTimeMillis() - TEST_VARIABLE) + "ms")));
+                        TEST_VARIABLE = 0;
+                    }
                     this.queue.drain(Runnable::run);
                 } catch (Exception e) {
                     MinecraftServer.getExceptionManager().handleException(e);
