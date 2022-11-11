@@ -1,6 +1,5 @@
 package net.minestom.server.network.socket;
 
-import net.kyori.adventure.text.Component;
 import net.minestom.server.MinecraftServer;
 import net.minestom.server.network.player.PlayerSocketConnection;
 import net.minestom.server.thread.MinestomThread;
@@ -41,16 +40,11 @@ public final class Worker extends MinestomThread {
         }
     }
 
-    public static long TEST_VARIABLE = 0;
     @Override
     public void run() {
         while (server.isOpen()) {
             try {
                 try {
-                    if (TEST_VARIABLE != 0) {
-                        MinecraftServer.getInstanceManager().getInstances().forEach(i -> i.sendMessage(Component.text("Queue drain: " + (System.currentTimeMillis() - TEST_VARIABLE) + "ms")));
-                        TEST_VARIABLE = 0;
-                    }
                     this.queue.drain(Runnable::run);
                 } catch (Exception e) {
                     MinecraftServer.getExceptionManager().handleException(e);
@@ -64,7 +58,7 @@ public final class Worker extends MinestomThread {
                     }
                 }
                 // Wait for an event
-                this.selector.select(key -> {
+                this.selector.selectNow(key -> {
                     final SocketChannel channel = (SocketChannel) key.channel();
                     if (!channel.isOpen()) return;
                     if (!key.isReadable()) return;
@@ -93,7 +87,7 @@ public final class Worker extends MinestomThread {
                         MinecraftServer.getExceptionManager().handleException(t);
                         connection.disconnect();
                     }
-                }, PACKET_WORKER_TIMEOUT); //MinecraftServer.TICK_MS
+                }); //MinecraftServer.TICK_MS
             } catch (Exception e) {
                 MinecraftServer.getExceptionManager().handleException(e);
             }
