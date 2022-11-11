@@ -21,8 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @ApiStatus.Internal
 public final class Worker extends MinestomThread {
-    private static final int PACKET_WORKER_TIMEOUT = Integer.getInteger("minestom.packet-worker-timeout", MinecraftServer.TICK_MS);
-
     private static final AtomicInteger COUNTER = new AtomicInteger();
 
     final Selector selector;
@@ -58,7 +56,7 @@ public final class Worker extends MinestomThread {
                     }
                 }
                 // Wait for an event
-                this.selector.selectNow(key -> {
+                this.selector.select(key -> {
                     final SocketChannel channel = (SocketChannel) key.channel();
                     if (!channel.isOpen()) return;
                     if (!key.isReadable()) return;
@@ -87,7 +85,7 @@ public final class Worker extends MinestomThread {
                         MinecraftServer.getExceptionManager().handleException(t);
                         connection.disconnect();
                     }
-                }); //MinecraftServer.TICK_MS
+                }, MinecraftServer.TICK_MS);
             } catch (Exception e) {
                 MinecraftServer.getExceptionManager().handleException(e);
             }
