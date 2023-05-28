@@ -55,11 +55,13 @@ import net.minestom.server.network.packet.server.SendablePacket;
 import net.minestom.server.network.packet.server.ServerPacket;
 import net.minestom.server.network.packet.server.login.LoginDisconnectPacket;
 import net.minestom.server.network.packet.server.play.*;
+import net.minestom.server.network.packet.server.play.data.DeathLocation;
 import net.minestom.server.network.player.GameProfile;
 import net.minestom.server.network.player.PlayerConnection;
 import net.minestom.server.network.player.PlayerSocketConnection;
 import net.minestom.server.recipe.Recipe;
 import net.minestom.server.recipe.RecipeManager;
+import net.minestom.server.registry.Registry;
 import net.minestom.server.resourcepack.ResourcePack;
 import net.minestom.server.scoreboard.BelowNameTag;
 import net.minestom.server.scoreboard.Team;
@@ -88,7 +90,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jglrxavpok.hephaistos.nbt.NBT;
-import org.jglrxavpok.hephaistos.nbt.NBTCompound;
+import org.jglrxavpok.hephaistos.nbt.NBTType;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -123,6 +125,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
     private DimensionType dimensionType;
     private GameMode gameMode;
+    private DeathLocation deathLocation;
     /**
      * Keeps track of what chunks are sent to the client, this defines the center of the loaded area
      * in the range of {@link MinecraftServer#getChunkViewDistance()}
@@ -246,14 +249,39 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     public CompletableFuture<Void> UNSAFE_init(@NotNull Instance spawnInstance) {
         this.dimensionType = spawnInstance.getDimensionType();
 
-        NBTCompound nbt = NBT.Compound(Map.of(
-                "minecraft:chat_type", Messenger.chatRegistry(),
-                "minecraft:dimension_type", MinecraftServer.getDimensionTypeManager().toNBT(),
-                "minecraft:worldgen/biome", MinecraftServer.getBiomeManager().toNBT()));
+        var registry = new HashMap<String, NBT>();
+        registry.put("minecraft:chat_type", Messenger.chatRegistry());
+        registry.put("minecraft:dimension_type", MinecraftServer.getDimensionTypeManager().toNBT());
+        registry.put("minecraft:worldgen/biome", MinecraftServer.getBiomeManager().toNBT());
+
+        var damageTypeData = Registry.load(Registry.Resource.DAMAGE_TYPES);
+        var damageTypes = new ArrayList<NBT>();
+        int i = 0;
+        for (var entry : damageTypeData.entrySet()) {
+            var elem = new HashMap<String, NBT>();
+            for (var e : entry.getValue().entrySet()) {
+                if (e.getValue() instanceof String s) {
+                    elem.put(e.getKey(), NBT.String(s));
+                } else if (e.getValue() instanceof Double f) {
+                    elem.put(e.getKey(), NBT.Float(f.floatValue()));
+                } else if (e.getValue() instanceof Integer integer) {
+                    elem.put(e.getKey(), NBT.Int(integer));
+                }
+            }
+            damageTypes.add(NBT.Compound(Map.of(
+                    "id", NBT.Int(i++),
+                    "name", NBT.String(entry.getKey()),
+                    "element", NBT.Compound(elem)
+            )));
+        }
+        registry.put("minecraft:damage_type", NBT.Compound(Map.of(
+                "type", NBT.String("minecraft:damage_type"),
+                "value", NBT.List(NBTType.TAG_Compound, damageTypes)
+        )));
         final JoinGamePacket joinGamePacket = new JoinGamePacket(getEntityId(), false, gameMode, null,
-                List.of("minestom:world"), nbt, dimensionType.toString(), "minestom:world",
+                List.of(dimensionType.getName().asString()), NBT.Compound(registry), dimensionType.toString(), dimensionType.getName().asString(),
                 0, 0, MinecraftServer.getChunkViewDistance(), MinecraftServer.getChunkViewDistance(),
-                false, true, false, levelFlat);
+                false, true, false, levelFlat, deathLocation);
         sendPacket(joinGamePacket);
 
         // Server brand name
@@ -428,6 +456,10 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
             if (chatMessage != null) {
                 Audiences.players().sendMessage(chatMessage);
             }
+
+            // Set death location
+            if (getInstance() != null)
+                setDeathLocation(getInstance().getDimensionType(), getPosition());
         }
         super.kill();
     }
@@ -443,8 +475,9 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         setFireForDuration(0);
         setOnFire(false);
         refreshHealth();
+
         sendPacket(new RespawnPacket(getDimensionType().toString(), getDimensionType().getName().asString(),
-               0, gameMode, gameMode, false, levelFlat, true));
+                0, gameMode, gameMode, false, levelFlat, true, deathLocation));
 
         PlayerRespawnEvent respawnEvent = new PlayerRespawnEvent(this);
         EventDispatcher.call(respawnEvent);
@@ -455,7 +488,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         Pos respawnPosition = respawnEvent.getRespawnPosition();
 
         // The client unloads chunks when respawning, so resend all chunks next to spawn
-        ChunkUtils.forChunksInRange(respawnPosition, MinecraftServer.getChunkViewDistance(), (chunkX, chunkZ) ->
+        ChunkUtils.forChunksInRange(respawnPosition, Math.min(MinecraftServer.getChunkViewDistance(), settings.getViewDistance()), (chunkX, chunkZ) ->
                 this.instance.loadOptionalChunk(chunkX, chunkZ).thenAccept(chunk -> {
                     try {
                         if (chunk != null) {
@@ -466,6 +499,14 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
                     }
                 }));
         chunksLoadedByClient = new Vec(respawnPosition.chunkX(), respawnPosition.chunkZ());
+        // Client also needs all entities resent to them, since those are unloaded as well
+        this.instance.getEntityTracker().nearbyEntitiesByChunkRange(respawnPosition, Math.min(MinecraftServer.getChunkViewDistance(), settings.getViewDistance()),
+                EntityTracker.Target.ENTITIES, entity -> {
+                    // Skip refreshing self with a new viewer
+                    if (!entity.getUuid().equals(uuid)) {
+                        entity.updateNewViewer(this);
+                    }
+                });
         teleport(respawnPosition).thenRun(this::refreshAfterTeleport);
     }
 
@@ -560,6 +601,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
             return AsyncUtils.VOID_FUTURE;
         }
         // Must update the player chunks
+        chunkUpdateLimitChecker.clearHistory();
         final boolean dimensionChange = !Objects.equals(dimensionType, instance.getDimensionType());
         final Consumer<Instance> runnable = (i) -> spawnPlayer(i, spawnPosition,
                 currentInstance == null, dimensionChange, true);
@@ -650,6 +692,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
             final int chunkX = spawnPosition.chunkX();
             final int chunkZ = spawnPosition.chunkZ();
             chunksLoadedByClient = new Vec(chunkX, chunkZ);
+            chunkUpdateLimitChecker.addToHistory(getChunk());
             sendPacket(new UpdateViewPositionPacket(chunkX, chunkZ));
             ChunkUtils.forChunksInRange(spawnPosition, MinecraftServer.getChunkViewDistance(), chunkAdder);
         }
@@ -693,6 +736,10 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     @Override
     public void playSound(@NotNull Sound sound) {
         this.playSound(sound, this.position.x(), this.position.y(), this.position.z());
+    }
+
+    public void playSound(@NotNull Sound sound, @NotNull Point point) {
+        sendPacket(AdventurePacketConvertor.createSoundPacket(sound, point.x(), point.y(), point.z()));
     }
 
     @Override
@@ -922,8 +969,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
      */
     public void setDisplayName(@Nullable Component displayName) {
         this.displayName = displayName;
-        PacketUtils.broadcastPacket(new PlayerInfoPacket(PlayerInfoPacket.Action.UPDATE_DISPLAY_NAME,
-                new PlayerInfoPacket.UpdateDisplayName(getUuid(), displayName)));
+        PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
     }
 
     /**
@@ -951,11 +997,11 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
         DestroyEntitiesPacket destroyEntitiesPacket = new DestroyEntitiesPacket(getEntityId());
 
-        final PlayerInfoPacket removePlayerPacket = getRemovePlayerToList();
-        final PlayerInfoPacket addPlayerPacket = getAddPlayerToList();
+        final PlayerInfoRemovePacket removePlayerPacket = getRemovePlayerToList();
+        final PlayerInfoUpdatePacket addPlayerPacket = getAddPlayerToList();
 
-        RespawnPacket respawnPacket = new RespawnPacket(getDimensionType().toString(), "minestom:world",
-                0, gameMode, gameMode, false, levelFlat, true);
+        RespawnPacket respawnPacket = new RespawnPacket(getDimensionType().toString(), getDimensionType().getName().asString(),
+                0, gameMode, gameMode, false, levelFlat, true, deathLocation);
 
         sendPacket(removePlayerPacket);
         sendPacket(destroyEntitiesPacket);
@@ -975,6 +1021,14 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
         getInventory().update();
         teleport(getPosition());
+    }
+
+    public void setDeathLocation(@NotNull DimensionType type, @NotNull Pos position) {
+        this.deathLocation = new DeathLocation(type.getName().asString(), position);
+    }
+
+    public @Nullable DeathLocation getDeathLocation() {
+        return this.deathLocation;
     }
 
     /**
@@ -1278,8 +1332,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         // Condition to prevent sending the packets before spawning the player
         if (isActive()) {
             sendPacket(new ChangeGameStatePacket(ChangeGameStatePacket.Reason.CHANGE_GAMEMODE, gameMode.id()));
-            PacketUtils.broadcastPacket(new PlayerInfoPacket(PlayerInfoPacket.Action.UPDATE_GAMEMODE,
-                    new PlayerInfoPacket.UpdateGameMode(getUuid(), gameMode)));
+            PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, infoEntry()));
         }
 
         // The client updates their abilities based on the GameMode as follows
@@ -1327,8 +1380,8 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         Check.argCondition(dimensionType.equals(getDimensionType()),
                 "The dimension needs to be different than the current one!");
         this.dimensionType = dimensionType;
-        sendPacket(new RespawnPacket(dimensionType.toString(), "minestom:world",
-                0, gameMode, gameMode, false, levelFlat, true));
+        sendPacket(new RespawnPacket(dimensionType.toString(), getDimensionType().getName().asString(),
+                0, gameMode, gameMode, false, levelFlat, true, deathLocation));
         refreshClientStateAfterRespawn();
     }
 
@@ -1524,7 +1577,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     @ApiStatus.Internal
     protected void synchronizePosition(boolean includeSelf) {
         if (includeSelf) {
-            sendPacket(new PlayerPositionAndLookPacket(position, (byte) 0x00, getNextTeleportId(), false));
+            sendPacket(new PlayerPositionAndLookPacket(position, (byte) 0x00, getNextTeleportId()));
         }
         super.synchronizePosition(includeSelf);
     }
@@ -1779,8 +1832,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
      */
     public void refreshLatency(int latency) {
         this.latency = latency;
-        PacketUtils.broadcastPacket(new PlayerInfoPacket(PlayerInfoPacket.Action.UPDATE_LATENCY,
-                new PlayerInfoPacket.UpdateLatency(getUuid(), latency)));
+        PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_LATENCY, infoEntry()));
     }
 
     public void refreshOnGround(boolean onGround) {
@@ -1898,24 +1950,29 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     /**
      * Gets the packet to add the player from the tab-list.
      *
-     * @return a {@link PlayerInfoPacket} to add the player
+     * @return a {@link PlayerInfoUpdatePacket} to add the player
      */
-    protected @NotNull PlayerInfoPacket getAddPlayerToList() {
-        final PlayerSkin skin = this.skin;
-        List<PlayerInfoPacket.AddPlayer.Property> prop = skin != null ?
-                List.of(new PlayerInfoPacket.AddPlayer.Property("textures", skin.textures(), skin.signature())) :
-                List.of();
-        return new PlayerInfoPacket(PlayerInfoPacket.Action.ADD_PLAYER,
-                new PlayerInfoPacket.AddPlayer(getUuid(), getUsername(), prop, getGameMode(), getLatency(), displayName, null));
+    protected @NotNull PlayerInfoUpdatePacket getAddPlayerToList() {
+        return new PlayerInfoUpdatePacket(EnumSet.of(PlayerInfoUpdatePacket.Action.ADD_PLAYER, PlayerInfoUpdatePacket.Action.UPDATE_LISTED),
+                List.of(infoEntry()));
     }
 
     /**
      * Gets the packet to remove the player from the tab-list.
      *
-     * @return a {@link PlayerInfoPacket} to remove the player
+     * @return a {@link PlayerInfoRemovePacket} to remove the player
      */
-    protected @NotNull PlayerInfoPacket getRemovePlayerToList() {
-        return new PlayerInfoPacket(PlayerInfoPacket.Action.REMOVE_PLAYER, new PlayerInfoPacket.RemovePlayer(getUuid()));
+    protected @NotNull PlayerInfoRemovePacket getRemovePlayerToList() {
+        return new PlayerInfoRemovePacket(getUuid());
+    }
+
+    private PlayerInfoUpdatePacket.Entry infoEntry() {
+        final PlayerSkin skin = this.skin;
+        List<PlayerInfoUpdatePacket.Property> prop = skin != null ?
+                List.of(new PlayerInfoUpdatePacket.Property("textures", skin.textures(), skin.signature())) :
+                List.of();
+        return new PlayerInfoUpdatePacket.Entry(getUuid(), getUsername(), prop,
+                true, getLatency(), getGameMode(), displayName, null);
     }
 
     /**
@@ -2064,6 +2121,12 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         }
     }
 
+    @Override
+    public @NotNull CompletableFuture<Void> teleport(@NotNull Pos position, long @Nullable [] chunks) {
+        chunkUpdateLimitChecker.clearHistory();
+        return super.teleport(position, chunks);
+    }
+
     /**
      * Represents the main or off hand of the player.
      */
@@ -2174,7 +2237,8 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         public void refresh(String locale, byte viewDistance, ChatMessageType chatMessageType, boolean chatColors,
                             byte displayedSkinParts, MainHand mainHand, boolean enableTextFiltering, boolean allowServerListings) {
             this.locale = locale;
-            this.viewDistance = viewDistance;
+            // Clamp viewDistance to valid bounds
+            this.viewDistance = (byte) MathUtils.clamp(viewDistance, 2, 32);
             this.chatMessageType = chatMessageType;
             this.chatColors = chatColors;
             this.displayedSkinParts = displayedSkinParts;
@@ -2183,7 +2247,10 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
             this.allowServerListings = allowServerListings;
 
             // TODO: Use the metadata object here
+            metadata.setNotifyAboutChanges(false);
             metadata.setIndex((byte) 17, Metadata.Byte(displayedSkinParts));
+            metadata.setIndex((byte) 18, Metadata.Byte((byte) (this.mainHand == MainHand.RIGHT ? 1 : 0)));
+            metadata.setNotifyAboutChanges(true);
         }
 
     }

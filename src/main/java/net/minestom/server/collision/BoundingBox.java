@@ -4,6 +4,7 @@ import net.minestom.server.coordinate.Point;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.coordinate.Vec;
 import net.minestom.server.entity.Entity;
+import net.minestom.server.instance.block.BlockFace;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +35,11 @@ public final class BoundingBox implements Shape {
     }
 
     @Override
+    public boolean isOccluded(@NotNull Shape shape, @NotNull BlockFace face) {
+        return false;
+    }
+
+    @Override
     @ApiStatus.Experimental
     public boolean intersectBox(@NotNull Point positionRelative, @NotNull BoundingBox boundingBox) {
         return (minX() + positionRelative.x() <= boundingBox.maxX() - Vec.EPSILON / 2 && maxX() + positionRelative.x() >= boundingBox.minX() + Vec.EPSILON / 2) &&
@@ -48,8 +54,10 @@ public final class BoundingBox implements Shape {
             finalResult.collidedShapePosition = shapePos;
             finalResult.collidedShape = this;
             finalResult.blockType = null;
+            return true;
         }
-        return true;
+
+        return false;
     }
 
     /**

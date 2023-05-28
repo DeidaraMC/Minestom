@@ -142,6 +142,7 @@ public final class Registry {
         POTION_EFFECTS("potion_effects.json"),
         POTION_TYPES("potions.json"),
         PARTICLES("particles.json"),
+        DAMAGE_TYPES("damage_types.json"),
 
         BLOCK_TAGS("tags/block_tags.json"),
         ENTITY_TYPE_TAGS("tags/entity_type_tags.json"),
@@ -169,6 +170,8 @@ public final class Registry {
         private final boolean air;
         private final boolean solid;
         private final boolean liquid;
+        private final boolean occludes;
+        private final int lightEmission;
         private final String blockEntity;
         private final int blockEntityId;
         private final Supplier<Material> materialSupplier;
@@ -188,7 +191,9 @@ public final class Registry {
             this.jumpFactor = main.getDouble("jumpFactor", 1);
             this.air = main.getBoolean("air", false);
             this.solid = main.getBoolean("solid");
+            this.occludes = main.getBoolean("occludes", true);
             this.liquid = main.getBoolean("liquid", false);
+            this.lightEmission = main.getInt("lightEmission", 0);
             {
                 Properties blockEntity = main.section("blockEntity");
                 if (blockEntity != null) {
@@ -204,8 +209,9 @@ public final class Registry {
                 this.materialSupplier = materialNamespace != null ? () -> Material.fromNamespaceId(materialNamespace) : () -> null;
             }
             {
-                final String string = main.getString("collisionShape");
-                this.shape = CollisionUtils.parseBlockShape(string, this);
+                final String collision = main.getString("collisionShape");
+                final String occlusion = main.getString("occlusionShape");
+                this.shape = CollisionUtils.parseBlockShape(collision, occlusion, this);
             }
         }
 
@@ -253,8 +259,16 @@ public final class Registry {
             return solid;
         }
 
+        public boolean occludes() {
+            return occludes;
+        }
+
         public boolean isLiquid() {
             return liquid;
+        }
+
+        public int lightEmission() {
+            return lightEmission;
         }
 
         public boolean isBlockEntity() {

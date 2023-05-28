@@ -64,6 +64,7 @@ import net.minestom.server.utils.validate.Check;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnknownNullability;
 import space.vectrix.flare.fastutil.Int2ObjectSyncMap;
 
 import java.time.Duration;
@@ -300,6 +301,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
             this.position = position;
             refreshCoordinate(position);
             synchronizePosition(true);
+            setView(position.yaw(), position.pitch());
         };
 
         if (chunks != null && chunks.length > 0) {
@@ -350,9 +352,10 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      * Changes the view of the entity so that it looks in a direction to the given entity.
      *
      * @param entity the entity to look at.
+     * @throws IllegalArgumentException if the entities are not in the same instance
      */
     public void lookAt(@NotNull Entity entity) {
-        Check.argCondition(entity.instance != instance, "Entity can look at another entity that is within it's own instance");
+        Check.argCondition(entity.instance != instance, "Entity cannot look at an entity in another instance");
         lookAt(entity.position.withY(entity.position.y() + entity.getEyeHeight()));
     }
 
@@ -664,6 +667,8 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
     }
 
     private void touchTick() {
+        if (!hasPhysics) return;
+
         // TODO do not call every tick (it is pretty expensive)
         final Pos position = this.position;
         final BoundingBox boundingBox = this.boundingBox;
@@ -837,7 +842,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      *
      * @return the entity instance, can be null if the entity doesn't have an instance yet
      */
-    public @Nullable Instance getInstance() {
+    public @UnknownNullability Instance getInstance() {
         return instance;
     }
 
@@ -997,6 +1002,10 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      */
     public double getDistance(@NotNull Entity entity) {
         return getDistance(entity.getPosition());
+    }
+
+    public double getDistanceSquared(@NotNull Point point) {
+        return getPosition().distanceSquared(point);
     }
 
     /**
@@ -1715,7 +1724,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
 
         Optional<Entity> nearby = instance.getNearbyEntities(position, range).stream()
                 .filter(finalPredicate)
-                .min(Comparator.comparingDouble(e -> e.getDistance(this.position)));
+                .min(Comparator.comparingDouble(e -> e.getDistanceSquared(this)));
 
         return nearby.orElse(null);
     }

@@ -11,6 +11,7 @@ import net.minestom.server.event.instance.InstanceChunkLoadEvent;
 import net.minestom.server.event.instance.InstanceChunkUnloadEvent;
 import net.minestom.server.event.player.PlayerBlockBreakEvent;
 import net.minestom.server.instance.block.Block;
+import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.instance.block.BlockHandler;
 import net.minestom.server.instance.block.rule.BlockPlacementRule;
 import net.minestom.server.instance.generator.Generator;
@@ -175,7 +176,7 @@ public class InstanceContainer extends Instance {
     }
 
     @Override
-    public boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition) {
+    public boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition, @NotNull BlockFace blockFace) {
         final Chunk chunk = getChunkAt(blockPosition);
         Check.notNull(chunk, "You cannot break blocks in a null chunk!");
         if (chunk.isReadOnly()) return false;
@@ -190,7 +191,7 @@ public class InstanceContainer extends Instance {
             chunk.sendChunk(player);
             return false;
         }
-        PlayerBlockBreakEvent blockBreakEvent = new PlayerBlockBreakEvent(player, block, Block.AIR, blockPosition);
+        PlayerBlockBreakEvent blockBreakEvent = new PlayerBlockBreakEvent(player, block, Block.AIR, blockPosition, blockFace);
         EventDispatcher.call(blockBreakEvent);
         final boolean allowed = !blockBreakEvent.isCancelled();
         if (allowed) {
@@ -327,9 +328,11 @@ public class InstanceContainer extends Instance {
                                 if (forkChunk != null) {
                                     applyFork(forkChunk, sectionModifier);
                                     // Update players
-                                    if (forkChunk instanceof DynamicChunk dynamicChunk) {
+                                    if (forkChunk instanceof LightingChunk lightingChunk) {
+                                        lightingChunk.chunkCache.invalidate();
+                                        lightingChunk.lightCache.invalidate();
+                                    } else if (forkChunk instanceof DynamicChunk dynamicChunk) {
                                         dynamicChunk.chunkCache.invalidate();
-                                        dynamicChunk.lightCache.invalidate();
                                     }
                                     forkChunk.sendChunk();
                                 } else {
@@ -426,6 +429,7 @@ public class InstanceContainer extends Instance {
      * @param chunkSupplier the new {@link ChunkSupplier} of this instance, chunks need to be non-null
      * @throws NullPointerException if {@code chunkSupplier} is null
      */
+    @Override
     public void setChunkSupplier(@NotNull ChunkSupplier chunkSupplier) {
         this.chunkSupplier = chunkSupplier;
     }

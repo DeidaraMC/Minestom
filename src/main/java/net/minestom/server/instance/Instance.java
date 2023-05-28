@@ -20,6 +20,7 @@ import net.minestom.server.event.EventNode;
 import net.minestom.server.event.instance.InstanceTickEvent;
 import net.minestom.server.event.trait.InstanceEvent;
 import net.minestom.server.instance.block.Block;
+import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.instance.block.BlockHandler;
 import net.minestom.server.instance.generator.Generator;
 import net.minestom.server.network.packet.server.play.BlockActionPacket;
@@ -33,6 +34,7 @@ import net.minestom.server.timer.Scheduler;
 import net.minestom.server.utils.ArrayUtils;
 import net.minestom.server.utils.PacketUtils;
 import net.minestom.server.utils.chunk.ChunkCache;
+import net.minestom.server.utils.chunk.ChunkSupplier;
 import net.minestom.server.utils.chunk.ChunkUtils;
 import net.minestom.server.utils.time.Cooldown;
 import net.minestom.server.utils.time.TimeUnit;
@@ -150,7 +152,7 @@ public abstract class Instance implements Block.Getter, Block.Setter,
      * @return true if the block has been broken, false if it has been cancelled
      */
     @ApiStatus.Internal
-    public abstract boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition);
+    public abstract boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition, @NotNull BlockFace blockFace);
 
     /**
      * Forces the generation of a {@link Chunk}, even if no file and {@link ChunkGenerator} are defined.
@@ -276,6 +278,14 @@ public abstract class Instance implements Block.Getter, Block.Setter,
     public void setChunkGenerator(@Nullable ChunkGenerator chunkGenerator) {
         setGenerator(chunkGenerator != null ? new ChunkGeneratorCompatibilityLayer(chunkGenerator) : null);
     }
+
+    public abstract void setChunkSupplier(@NotNull ChunkSupplier chunkSupplier);
+
+    /**
+     * Gets the chunk supplier of the instance.
+     * @return the chunk supplier of the instance
+     */
+    public abstract ChunkSupplier getChunkSupplier();
 
     /**
      * Gets the generator associated with the instance

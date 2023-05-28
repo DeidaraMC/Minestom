@@ -1,5 +1,6 @@
 package net.minestom.server.command;
 
+import net.minestom.server.MinecraftServer;
 import net.minestom.server.command.builder.Command;
 import net.minestom.server.command.builder.CommandDispatcher;
 import net.minestom.server.command.builder.CommandResult;
@@ -13,7 +14,9 @@ import net.minestom.server.utils.validate.Check;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.Callable;
 
 /**
  * Manager used to register {@link Command commands}.
@@ -21,6 +24,7 @@ import java.util.*;
  * It is also possible to simulate a command using {@link #execute(CommandSender, String)}.
  */
 public final class CommandManager {
+    private static final boolean ASYNC_VIRTUAL = Boolean.getBoolean("minestom.command.async-virtual");
 
     public static final String COMMAND_PREFIX = "/";
 
@@ -94,30 +98,59 @@ public final class CommandManager {
      * Executes a command for a {@link CommandSender}.
      *
      * @param sender  the sender of the command
-     * @param command the raw command string (without the command prefix)
+     * @param rawCommand the raw command string (without the command prefix)
      * @return the execution result
      */
-    public @NotNull CommandResult execute(@NotNull CommandSender sender, @NotNull String command) {
-        command = command.trim();
-        // Command event
-        if (sender instanceof Player player) {
-            PlayerCommandEvent playerCommandEvent = new PlayerCommandEvent(player, command);
-            EventDispatcher.call(playerCommandEvent);
-            if (playerCommandEvent.isCancelled())
-                return CommandResult.of(CommandResult.Type.CANCELLED, command);
-            command = playerCommandEvent.getCommand();
-        }
-        // Process the command
-        final CommandParser.Result parsedCommand = parseCommand(command);
-        final ExecutableCommand executable = parsedCommand.executable();
-        final ExecutableCommand.Result executeResult = executable.execute(sender);
-        final CommandResult result = resultConverter(executable, executeResult, command);
-        if (result.getType() == CommandResult.Type.UNKNOWN) {
-            if (unknownCommandCallback != null) {
-                this.unknownCommandCallback.apply(sender, command);
+    public @NotNull CommandResult execute(@NotNull CommandSender sender, @NotNull String rawCommand) {
+        Callable<CommandResult> callable = () -> {
+            var command = rawCommand.trim();
+            // Command event
+            if (sender instanceof Player player) {
+                PlayerCommandEvent playerCommandEvent = new PlayerCommandEvent(player, command);
+                EventDispatcher.call(playerCommandEvent);
+                if (playerCommandEvent.isCancelled())
+                    return CommandResult.of(CommandResult.Type.CANCELLED, command);
+                command = playerCommandEvent.getCommand();
             }
+            // Process the command
+            final CommandParser.Result parsedCommand = parseCommand(sender, command);
+            final ExecutableCommand executable = parsedCommand.executable();
+            final ExecutableCommand.Result executeResult = executable.execute(sender);
+            final CommandResult result = resultConverter(executable, executeResult, command);
+            if (result.getType() == CommandResult.Type.UNKNOWN) {
+                if (unknownCommandCallback != null) {
+                    this.unknownCommandCallback.apply(sender, command);
+                }
+            }
+            return result;
+        };
+
+
+        try {
+            if (ASYNC_VIRTUAL) {
+                class Reflection {
+                    static Method startVirtualThread = null;
+                }
+                if (Reflection.startVirtualThread == null) {
+                    Reflection.startVirtualThread = Thread.class.getDeclaredMethod("startVirtualThread", Runnable.class);
+                    Reflection.startVirtualThread.setAccessible(true);
+                }
+
+                Reflection.startVirtualThread.invoke(null, (Runnable) () -> {
+                    try {
+                        callable.call();
+                    } catch (Exception e) {
+                        MinecraftServer.getExceptionManager().handleException(e);
+                    }
+                });
+                return CommandResult.of(CommandResult.Type.UNKNOWN, rawCommand);
+            } else {
+                return callable.call();
+            }
+        } catch (Exception e) {
+            MinecraftServer.getExceptionManager().handleException(e);
+            return CommandResult.of(CommandResult.Type.UNKNOWN, rawCommand);
         }
-        return result;
     }
 
     /**
@@ -184,8 +217,8 @@ public final class CommandManager {
      * @param input commands string without prefix
      * @return the parsing result
      */
-    public CommandParser.Result parseCommand(String input) {
-        return parser.parse(getGraph(), input);
+    public CommandParser.Result parseCommand(@NotNull CommandSender sender, String input) {
+        return parser.parse(sender, getGraph(), input);
     }
 
     private Graph getGraph() {

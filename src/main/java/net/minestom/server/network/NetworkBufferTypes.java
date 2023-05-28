@@ -5,8 +5,12 @@ import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.minestom.server.coordinate.Point;
 import net.minestom.server.coordinate.Vec;
 import net.minestom.server.entity.Entity;
+import net.minestom.server.entity.metadata.animal.FrogMeta;
+import net.minestom.server.entity.metadata.animal.SnifferMeta;
+import net.minestom.server.entity.metadata.animal.tameable.CatMeta;
 import net.minestom.server.item.ItemStack;
 import net.minestom.server.item.Material;
+import net.minestom.server.network.packet.server.play.data.DeathLocation;
 import net.minestom.server.utils.Direction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.UnknownNullability;
@@ -456,7 +460,13 @@ final class NetworkBufferTypes {
                 if (!present) return null;
                 return buffer.read(UUID);
             });
-    static final TypeImpl<Integer> OPT_BLOCK_ID = new TypeImpl<>(Integer.class,
+    static final TypeImpl<Integer> BLOCK_STATE = new TypeImpl<>(Integer.class,
+            (buffer, value) -> {
+                buffer.write(NetworkBuffer.VAR_INT, value);
+                return -1;
+            },
+            buffer -> buffer.read(VAR_INT));
+    static final TypeImpl<Integer> OPT_BLOCK_STATE = new TypeImpl<>(Integer.class,
             (buffer, value) -> {
                 if (value == null) {
                     buffer.write(NetworkBuffer.VAR_INT, 0);
@@ -504,6 +514,91 @@ final class NetworkBufferTypes {
             buffer -> {
                 final int ordinal = buffer.read(VAR_INT);
                 return Entity.Pose.values()[ordinal];
+            });
+    static final TypeImpl<DeathLocation> DEATH_LOCATION = new TypeImpl<>(DeathLocation.class,
+            (buffer, value) -> {
+                if (value == null) {
+                    buffer.write(BOOLEAN, false);
+                } else {
+                    buffer.write(BOOLEAN, true);
+                    buffer.write(STRING, value.dimension());
+                    buffer.write(BLOCK_POSITION, value.position());
+                }
+                return -1;
+            },
+            buffer -> {
+                if (buffer.read(BOOLEAN)) {
+                    return new DeathLocation(buffer.read(STRING), buffer.read(BLOCK_POSITION));
+                }
+                return null;
+            });
+    static final TypeImpl<CatMeta.Variant> CAT_VARIANT = new TypeImpl<>(CatMeta.Variant.class,
+            (buffer, value) -> {
+                buffer.write(VAR_INT, value.ordinal());
+                return -1;
+            },
+            buffer -> {
+                final int ordinal = buffer.read(VAR_INT);
+                return CatMeta.Variant.values()[ordinal];
+            });
+    static final TypeImpl<FrogMeta.Variant> FROG_VARIANT = new TypeImpl<>(FrogMeta.Variant.class,
+            (buffer, value) -> {
+                buffer.write(VAR_INT, value.ordinal());
+                return -1;
+            },
+            buffer -> {
+                final int ordinal = buffer.read(VAR_INT);
+                return FrogMeta.Variant.values()[ordinal];
+            });
+    static final TypeImpl<SnifferMeta.State> SNIFFER_STATE = new TypeImpl<>(SnifferMeta.State.class,
+            (buffer, value) -> {
+                buffer.write(VAR_INT, value.ordinal());
+                return -1;
+            },
+            buffer -> {
+                final int ordinal = buffer.read(VAR_INT);
+                return SnifferMeta.State.values()[ordinal];
+            });
+    static final TypeImpl<Point> VECTOR3 = new TypeImpl<>(Point.class,
+            (buffer, value) -> {
+                buffer.write(FLOAT, (float) value.x());
+                buffer.write(FLOAT, (float) value.y());
+                buffer.write(FLOAT, (float) value.z());
+                return -1;
+            },
+            buffer -> {
+                final float x = buffer.read(FLOAT);
+                final float y = buffer.read(FLOAT);
+                final float z = buffer.read(FLOAT);
+                return new Vec(x, y, z);
+            });
+    static final TypeImpl<Point> VECTOR3D = new TypeImpl<>(Point.class,
+            (buffer, value) -> {
+                buffer.write(DOUBLE, value.x());
+                buffer.write(DOUBLE, value.y());
+                buffer.write(DOUBLE, value.z());
+                return -1;
+            },
+            buffer -> {
+                final double x = buffer.read(DOUBLE);
+                final double y = buffer.read(DOUBLE);
+                final double z = buffer.read(DOUBLE);
+                return new Vec(x, y, z);
+            });
+    static final TypeImpl<float[]> QUATERNION = new TypeImpl<>(float[].class,
+            (buffer, value) -> {
+                buffer.write(FLOAT, value[0]);
+                buffer.write(FLOAT, value[1]);
+                buffer.write(FLOAT, value[2]);
+                buffer.write(FLOAT, value[3]);
+                return -1;
+            },
+            buffer -> {
+                final float x = buffer.read(FLOAT);
+                final float y = buffer.read(FLOAT);
+                final float z = buffer.read(FLOAT);
+                final float w = buffer.read(FLOAT);
+                return new float[]{x, y, z, w};
             });
 
     record TypeImpl<T>(@NotNull Class<T> type,
