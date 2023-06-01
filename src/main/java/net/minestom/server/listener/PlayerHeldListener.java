@@ -27,11 +27,12 @@ public class PlayerHeldListener {
             // If the held slot has been changed by the event, send the change to the player
             if (resultSlot != slot) {
                 player.setHeldItemSlot(resultSlot);
-                player.refreshActiveHand(false, false, false);
             } else {
                 // Otherwise, simply refresh the player field
                 player.refreshHeldSlot(resultSlot);
             }
+
+            player.refreshActiveHand(false, false, false);
         } else {
             // Event has been canceled, send the last held slot to refresh the client
             player.setHeldItemSlot(player.getHeldSlot());
