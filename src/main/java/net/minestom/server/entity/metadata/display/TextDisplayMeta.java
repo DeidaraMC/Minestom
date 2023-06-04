@@ -48,7 +48,7 @@ public class TextDisplayMeta extends AbstractDisplayMeta {
     }
 
     public void setTextOpacity(int value) {
-        super.metadata.setIndex(OFFSET + 3, Metadata.VarInt(value));
+        super.metadata.setIndex(OFFSET + 3, Metadata.Byte((byte)value));
     }
 
     public boolean isShadow() {
