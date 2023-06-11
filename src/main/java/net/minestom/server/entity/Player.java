@@ -189,11 +189,11 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     private boolean reducedDebugScreenInformation;
 
     // Abilities
-    private boolean flying;
-    private boolean allowFlying;
-    private boolean instantBreak;
-    private float flyingSpeed = 0.05f;
-    private float fieldViewModifier = 0.1f;
+    private volatile boolean flying;
+    private volatile boolean allowFlying;
+    private volatile boolean instantBreak;
+    private volatile float flyingSpeed = 0.05f;
+    private volatile float fieldViewModifier = 0.1f;
 
     // Statistics
     private final Map<PlayerStatistic, Integer> statisticValueMap = new Hashtable<>();
