@@ -88,7 +88,7 @@ import java.util.function.UnaryOperator;
 public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, EventHandler<EntityEvent>, Taggable,
         PermissionHandler, HoverEventSource<ShowEntity>, Sound.Emitter {
 
-    private static final boolean NEVER_SEND_ROTATION_ONLY = PropertyUtils.getBoolean("minestom.never-send-rotation-only", true);
+    private static final boolean NEVER_SEND_ROTATION_ONLY = PropertyUtils.getBoolean("minestom.never-send-rotation-only", false);
     private static final int VELOCITY_UPDATE_INTERVAL = 1;
 
     private static final Int2ObjectSyncMap<Entity> ENTITY_BY_ID = Int2ObjectSyncMap.hashmap();
@@ -1323,7 +1323,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         if (distanceX > 8 || distanceY > 8 || distanceZ > 8) {
             PacketUtils.prepareViewablePacket(chunk, new EntityTeleportPacket(getEntityId(), position, isOnGround()), this);
             this.lastAbsoluteSynchronizationTime = System.currentTimeMillis();
-        } else if (positionChange && (viewChange || NEVER_SEND_ROTATION_ONLY)) {
+        } else if (positionChange && viewChange) {
             PacketUtils.prepareViewablePacket(chunk, EntityPositionAndRotationPacket.getPacket(getEntityId(), position,
                     lastSyncedPosition, isOnGround()), this);
             // Fix head rotation
@@ -1334,8 +1334,10 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
             PacketUtils.prepareViewablePacket(chunk, EntityPositionAndRotationPacket.getPacket(getEntityId(), position,
                     lastSyncedPosition, onGround), this);
         } else if (viewChange) {
+            var packet = NEVER_SEND_ROTATION_ONLY ? EntityPositionAndRotationPacket.getPacket(getEntityId(), position, lastSyncedPosition, isOnGround()) :
+                    new EntityRotationPacket(getEntityId(), position.yaw(), position.pitch(), onGround);
             PacketUtils.prepareViewablePacket(chunk, new EntityHeadLookPacket(getEntityId(), position.yaw()), this);
-            PacketUtils.prepareViewablePacket(chunk, new EntityRotationPacket(getEntityId(), position.yaw(), position.pitch(), onGround), this);
+            PacketUtils.prepareViewablePacket(chunk, packet, this);
         }
         this.lastSyncedPosition = position;
     }
