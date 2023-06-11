@@ -272,17 +272,17 @@ final class ServerProcessImpl implements ServerProcess {
             // Flush all waiting packets
             PacketUtils.flush();
 
-            // Tell workers to send queued outbound packets immediately
-            if (END_OF_TICK_WAKEUP) {
-                server.wakeupWorkers();
-            }
-
             // Monitoring
             {
                 final double acquisitionTimeMs = Acquirable.resetAcquiringTime() / 1e6D;
                 final double tickTimeMs = (System.nanoTime() - nanoTime) / 1e6D;
                 final TickMonitor tickMonitor = new TickMonitor(tickTimeMs, acquisitionTimeMs);
                 EventDispatcher.call(new ServerTickMonitorEvent(tickMonitor));
+            }
+
+            // Tell workers to send queued outbound packets immediately
+            if (END_OF_TICK_WAKEUP) {
+                server.wakeupWorkers();
             }
         }
 
