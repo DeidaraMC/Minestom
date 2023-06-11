@@ -132,7 +132,7 @@ public final class Server {
         return port;
     }
 
-    public void wakeupWorkers() {
+    public synchronized void wakeupWorkers() {
         workers.forEach(worker -> worker.selector.wakeup());
     }
 
