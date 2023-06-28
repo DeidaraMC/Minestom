@@ -1,5 +1,6 @@
 package net.minestom.server.entity;
 
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.kyori.adventure.audience.MessageType;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.identity.Identified;
@@ -71,6 +72,7 @@ import net.minestom.server.snapshot.SnapshotImpl;
 import net.minestom.server.snapshot.SnapshotUpdater;
 import net.minestom.server.statistic.PlayerStatistic;
 import net.minestom.server.timer.Scheduler;
+import net.minestom.server.timer.TaskSchedule;
 import net.minestom.server.utils.MathUtils;
 import net.minestom.server.utils.PacketUtils;
 import net.minestom.server.utils.async.AsyncUtils;
@@ -99,6 +101,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
@@ -158,6 +161,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     private final PlayerSettings settings;
     private float exp;
     private int level;
+    private int portalCooldown = 0;
 
     protected PlayerInventory inventory;
     private Inventory openInventory;
@@ -281,7 +285,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         final JoinGamePacket joinGamePacket = new JoinGamePacket(getEntityId(), false, gameMode, null,
                 List.of(dimensionType.getName().asString()), NBT.Compound(registry), dimensionType.toString(), dimensionType.getName().asString(),
                 0, 0, MinecraftServer.getChunkViewDistance(), MinecraftServer.getChunkViewDistance(),
-                false, true, false, levelFlat, deathLocation);
+                false, true, false, levelFlat, deathLocation, portalCooldown);
         sendPacket(joinGamePacket);
 
         // Server brand name
@@ -453,7 +457,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
             // #buildDeathScreenText can return null, check here
             if (deathText != null) {
-                sendPacket(new DeathCombatEventPacket(getEntityId(), -1, deathText));
+                sendPacket(new DeathCombatEventPacket(getEntityId(), deathText));
             }
 
             // #buildDeathMessage can return null, check here
@@ -481,7 +485,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         refreshHealth();
 
         sendPacket(new RespawnPacket(getDimensionType().toString(), getDimensionType().getName().asString(),
-                0, gameMode, gameMode, false, levelFlat, true, deathLocation));
+                0, gameMode, gameMode, false, levelFlat, true, deathLocation, portalCooldown));
 
         PlayerRespawnEvent respawnEvent = new PlayerRespawnEvent(this);
         EventDispatcher.call(respawnEvent);
@@ -698,7 +702,27 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
             chunksLoadedByClient = new Vec(chunkX, chunkZ);
             chunkUpdateLimitChecker.addToHistory(getChunk());
             sendPacket(new UpdateViewPositionPacket(chunkX, chunkZ));
-            ChunkUtils.forChunksInRange(spawnPosition, MinecraftServer.getChunkViewDistance(), chunkAdder);
+
+            if (ChunkUtils.USE_NEW_CHUNK_SENDING) {
+                // FIXME: Improve this queueing. It is pretty scuffed
+                var chunkQueue = new LongArrayList();
+                ChunkUtils.forChunksInRange(spawnPosition, MinecraftServer.getChunkViewDistance(),
+                        (x, z) -> chunkQueue.add(ChunkUtils.getChunkIndex(x, z)));
+                var iter = chunkQueue.iterator();
+                Supplier<TaskSchedule> taskRunnable = () -> {
+                    for (int i = 0; i < 50; i++) {
+                        if (!iter.hasNext()) return TaskSchedule.stop();
+
+                        var next = iter.nextLong();
+                        chunkAdder.accept(ChunkUtils.getChunkCoordX(next), ChunkUtils.getChunkCoordZ(next));
+                    }
+
+                    return TaskSchedule.tick(20);
+                };
+                scheduler().submitTask(taskRunnable);
+            } else {
+                ChunkUtils.forChunksInRange(spawnPosition, MinecraftServer.getChunkViewDistance(), chunkAdder);
+            }
         }
 
         synchronizePosition(true); // So the player doesn't get stuck
@@ -1005,7 +1029,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         final PlayerInfoUpdatePacket addPlayerPacket = getAddPlayerToList();
 
         RespawnPacket respawnPacket = new RespawnPacket(getDimensionType().toString(), getDimensionType().getName().asString(),
-                0, gameMode, gameMode, false, levelFlat, true, deathLocation);
+                0, gameMode, gameMode, false, levelFlat, true, deathLocation, portalCooldown);
 
         sendPacket(removePlayerPacket);
         sendPacket(destroyEntitiesPacket);
@@ -1245,6 +1269,14 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         sendPacket(new SetExperiencePacket(exp, level, 0));
     }
 
+    public int getPortalCooldown() {
+        return portalCooldown;
+    }
+
+    public void setPortalCooldown(int portalCooldown) {
+        this.portalCooldown = portalCooldown;
+    }
+
     /**
      * Gets the player connection.
      * <p>
@@ -1385,7 +1417,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
                 "The dimension needs to be different than the current one!");
         this.dimensionType = dimensionType;
         sendPacket(new RespawnPacket(dimensionType.toString(), getDimensionType().getName().asString(),
-                0, gameMode, gameMode, false, levelFlat, true, deathLocation));
+                0, gameMode, gameMode, false, levelFlat, true, deathLocation, portalCooldown));
         refreshClientStateAfterRespawn();
     }
 
