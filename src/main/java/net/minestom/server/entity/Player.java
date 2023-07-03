@@ -212,7 +212,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     private final Pointers pointers;
 
     private boolean onlySendInfoEntriesToAudience = true;
-    private Audience infoEntryAudience = Audience.empty();
+    private @NotNull Audience infoEntryAudience = PacketGroupingAudience.of(List.of(this));
 
     public Player(@NotNull UUID uuid, @NotNull String username, @NotNull PlayerConnection playerConnection) {
         super(EntityType.PLAYER, uuid);
@@ -1852,7 +1852,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
     public void setInfoEntryAudience(@NotNull Audience infoEntryAudience)
     {
-        this.infoEntryAudience = Audience.audience(infoEntryAudience, PacketGroupingAudience.of(List.of(this)));
+        this.infoEntryAudience = Audience.audience(this.infoEntryAudience, PacketGroupingAudience.of(List.of(this)));
     }
 
     /**
