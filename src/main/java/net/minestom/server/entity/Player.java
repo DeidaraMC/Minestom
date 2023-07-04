@@ -322,10 +322,12 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
         if (displayName != null && onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
         else if (displayName != null) PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
-        for (var player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
-            if (player != this) {
-                sendPacket(player.getAddPlayerToList());
-                sendPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, player.infoEntry()));
+        if (!onlySendInfoEntriesToAudience) {
+            for (var player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
+                if (player != this) {
+                    sendPacket(player.getAddPlayerToList());
+                    sendPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, player.infoEntry()));
+                }
             }
         }
 
