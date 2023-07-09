@@ -14,6 +14,7 @@ import net.minestom.server.event.entity.projectile.ProjectileCollideWithBlockEve
 import net.minestom.server.event.entity.projectile.ProjectileCollideWithEntityEvent;
 import net.minestom.server.instance.Instance;
 import net.minestom.server.instance.block.Block;
+import net.minestom.server.network.packet.server.play.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Random;
@@ -38,9 +39,8 @@ public class PlayerProjectile extends LivingEntity {
         }
     }
 
-    public void shoot(Point from, double power, double spread) {
-        var to = from.add(shooter.getPosition().direction());
-        shoot(from, to, power, spread);
+    public void shoot(Point start, double power, double spread) {
+        this.shoot(start, shooter.getPosition().direction(), power, spread);
     }
 
     @Override
@@ -57,50 +57,27 @@ public class PlayerProjectile extends LivingEntity {
         return res;
     }
 
-    public void shoot(@NotNull Point from, @NotNull Point to, double power, double spread) {
+    public void shoot(@NotNull Point start, @NotNull Vec direction, double power, double spread) {
         var instance = shooter.getInstance();
         if (instance == null) return;
 
-        float yaw = -shooter.getPosition().yaw();
-        float pitch = -shooter.getPosition().pitch();
-
-        double pitchDiff = pitch - 45;
-        if (pitchDiff == 0) pitchDiff = 0.0001;
-        double pitchAdjust = pitchDiff * 0.002145329238474369D;
-
-        double dx = to.x() - from.x();
-        double dy = to.y() - from.y() + pitchAdjust;
-        double dz = to.z() - from.z();
-        if (!hasNoGravity()) {
-            final double xzLength = Math.sqrt(dx * dx + dz * dz);
-            dy += xzLength * 0.20000000298023224D;
-        }
-
-        final double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        dx /= length;
-        dy /= length;
-        dz /= length;
         Random random = ThreadLocalRandom.current();
         spread *= 0.007499999832361937D;
-        dx += random.nextGaussian() * spread;
-        dy += random.nextGaussian() * spread;
-        dz += random.nextGaussian() * spread;
+        Vec velocity = direction.add(random.nextGaussian() * spread, random.nextGaussian() * spread, random.nextGaussian() * spread)
+                .mul(MinecraftServer.TICK_PER_SECOND * power);
 
-        final EntityShootEvent shootEvent = new EntityShootEvent(this.shooter, this, from, power, spread);
+        final EntityShootEvent shootEvent = new EntityShootEvent(this.shooter, this, start, power, spread);
         EventDispatcher.call(shootEvent);
         if (shootEvent.isCancelled()) {
             remove();
             return;
         }
 
-        final double mul = 20 * power;
-        Vec v = new Vec(dx * mul, dy * mul * 0.9, dz * mul);
-
-        this.setInstance(instance, new Pos(from.x(), from.y(), from.z(), yaw, pitch)).whenComplete((result, throwable) -> {
+        //set velocity immediately before setting instance
+        setVelocity(velocity);
+        this.setInstance(instance, Pos.fromPoint(start).withDirection(direction)).whenComplete((result, throwable) -> {
             if (throwable != null) {
                 throwable.printStackTrace();
-            } else {
-                this.setVelocity(v);
             }
         });
 
@@ -120,8 +97,12 @@ public class PlayerProjectile extends LivingEntity {
         return null;
     }
 
+
+    /**
+     * Don't want this to do anything when on projectile entities, handled differently in tick method
+     */
     @Override
-    public void refreshPosition(@NotNull Pos newPosition) {
+    protected void synchronizePosition(boolean includeSelf) {
     }
 
     @Override
@@ -138,10 +119,11 @@ public class PlayerProjectile extends LivingEntity {
                 null, true
         );
 
-        if (cooldown + 500 < System.currentTimeMillis()) {
+        if (cooldown + 1000 < System.currentTimeMillis()) {
             float yaw = (float) Math.toDegrees(Math.atan2(diff.x(), diff.z()));
             float pitch = (float) Math.toDegrees(Math.atan2(diff.y(), Math.sqrt(diff.x() * diff.x() + diff.z() * diff.z())));
-            super.refreshPosition(new Pos(posNow.x(), posNow.y(), posNow.z(), yaw, pitch));
+            sendPacketsToViewers(new EntityTeleportPacket(getEntityId(), position.withYaw(yaw).withPitch(pitch), onGround));
+            sendPacketsToViewers(getVelocityPacket());
             cooldown = System.currentTimeMillis();
         }
 
@@ -175,5 +157,18 @@ public class PlayerProjectile extends LivingEntity {
             var e = new ProjectileCollideWithBlockEvent(this, Pos.fromPoint(hitPoint), hitBlock);
             MinecraftServer.getGlobalEventHandler().call(e);
         }
+    }
+
+    /**
+     * Update the position without sending teleport packets
+     */
+    @Override
+    public void refreshPosition(@NotNull final Pos newPosition, boolean ignoreView) {
+        final var previousPosition = this.position;
+        final Pos position = ignoreView ? previousPosition.withCoord(newPosition) : newPosition;
+        if (position.equals(lastSyncedPosition)) return;
+        this.position = position;
+        this.previousPosition = previousPosition;
+        if (!position.samePoint(previousPosition)) refreshCoordinate(position);
     }
 }

@@ -644,7 +644,8 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
 
     protected void updateVelocity(boolean wasOnGround, boolean flying, Pos positionBeforeMove, Vec newVelocity) {
         EntitySpawnType type = entityType.registry().spawnType();
-        final double airDrag = type == EntitySpawnType.LIVING || type == EntitySpawnType.PLAYER ? 0.91 : 0.98;
+        double airDrag = type == EntitySpawnType.LIVING || type == EntitySpawnType.PLAYER ? 0.91 : 0.98;
+        airDrag = (entityType == EntityType.ARROW || entityType == EntityType.SPECTRAL_ARROW) ? 0.99 : airDrag; //TODO change these drag values to use registry?
         final double drag;
         if (wasOnGround) {
             final Chunk chunk = ChunkUtils.retrieve(instance, currentChunk, position);
@@ -660,7 +661,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
                 // Apply gravity and drag
                 .apply((x, y, z) -> new Vec(
                         x * drag,
-                        !hasNoGravity() ? (y - gravity) * gravityDrag : y,
+                        !hasNoGravity() ? y * gravityDrag - gravity : y,
                         z * drag
                 ))
                 // Convert from block/tick to block/sec
@@ -1389,7 +1390,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      *
      * @param newPosition the new position
      */
-    private void refreshCoordinate(Point newPosition) {
+    protected void refreshCoordinate(Point newPosition) {
         // Passengers update
         final Set<Entity> passengers = getPassengers();
         if (!passengers.isEmpty()) {
