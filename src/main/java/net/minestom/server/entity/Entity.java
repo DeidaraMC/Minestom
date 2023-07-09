@@ -636,7 +636,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         // Verify if velocity packet has to be sent
         if (this.ticks % VELOCITY_UPDATE_INTERVAL == 0) {
             if (!isPlayer && (hasVelocity || !lastVelocityWasZero)) {
-                sendPacketToViewers(getVelocityPacket());
+               // sendPacketToViewers(getVelocityPacket()); //TODO keep this until something breaks? (entities shouldn't need constant velocity every tick)
                 this.lastVelocityWasZero = !hasVelocity;
             }
         }
