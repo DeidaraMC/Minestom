@@ -1707,11 +1707,13 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
     @Override
     public void setSneaking(boolean sneaking) {
+        this.setTag(EntityTags.SETTING_SNEAKING, true);
         if (isFlying()) { //If we are flying, don't set the players pose to sneaking as this can clip them through blocks
             this.entityMeta.setSneaking(sneaking);
         } else {
             super.setSneaking(sneaking);
         }
+        this.setTag(EntityTags.SETTING_SNEAKING, false);
     }
 
     /**

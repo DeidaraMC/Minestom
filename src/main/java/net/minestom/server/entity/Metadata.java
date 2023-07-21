@@ -201,9 +201,10 @@ public final class Metadata {
                 synchronized (this.notNotifiedChanges) {
                     this.notNotifiedChanges.put(index, entry);
                 }
-            } else {
-                entity.sendPacketToViewersAndSelf(new EntityMetaDataPacket(entity.getEntityId(), Map.of(index, entry)));
-            }
+            } else if (entity instanceof Player player && (player.getTag(EntityTags.REFRESHING_ACTIVE_HAND) || player.getTag(EntityTags.SETTING_SNEAKING))) {
+                player.sendPacket(new EntityMetaDataPacket(entity.getEntityId(), getSelfPlayerEntries(Map.of(index, entry))));
+                player.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), Map.of(index, entry)));
+            } else entity.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), Map.of(index, entry)));
         }
     }
 
@@ -223,7 +224,10 @@ public final class Metadata {
             entries = Map.copyOf(awaitingChanges);
             awaitingChanges.clear();
         }
-        entity.sendPacketToViewersAndSelf(new EntityMetaDataPacket(entity.getEntityId(), entries));
+        if (entity instanceof Player player && (player.getTag(EntityTags.REFRESHING_ACTIVE_HAND) || player.getTag(EntityTags.SETTING_SNEAKING))) {
+            player.sendPacket(new EntityMetaDataPacket(entity.getEntityId(), getSelfPlayerEntries(entries)));
+            player.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), entries));
+        } else entity.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), entries));
     }
 
     public @NotNull Map<Integer, Entry<?>> getEntries() {
@@ -238,6 +242,18 @@ public final class Metadata {
             this.entryMap = Map.copyOf(map);
         }
         return map;
+    }
+
+    private @NotNull Map<Integer, Entry<?>> getSelfPlayerEntries(@NotNull Map<Integer, Entry<?>> entries) {
+        Map<Integer, Metadata.Entry<?>> playerEntries = new HashMap<>();
+        //Client handles these metadata states automatically
+        entries.forEach((offset, entry) -> {
+            if (offset != 6 && offset != 8) {
+                playerEntries.put(offset, entry);
+            }
+        });
+
+        return Map.copyOf(playerEntries);
     }
 
     public sealed interface Entry<T> extends NetworkBuffer.Writer
