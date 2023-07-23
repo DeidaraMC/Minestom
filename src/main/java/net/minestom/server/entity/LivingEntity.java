@@ -550,9 +550,7 @@ public class LivingEntity extends Entity implements EquipmentHandler {
             meta.setHandActive(isHandActive);
             meta.setActiveHand(offHand ? Player.Hand.OFF : Player.Hand.MAIN);
             meta.setInRiptideSpinAttack(riptideSpinAttack);
-            this.setTag(EntityTags.REFRESHING_ACTIVE_HAND, true);
             meta.setNotifyAboutChanges(true);
-            this.setTag(EntityTags.REFRESHING_ACTIVE_HAND, false);
 
             updatePose(); // Riptide spin attack has a pose
         }
