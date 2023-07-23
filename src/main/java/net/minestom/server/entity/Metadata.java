@@ -227,7 +227,7 @@ public final class Metadata {
         if (entity instanceof Player player && player.getTag(EntityTags.SETTING_SNEAKING)) {
             player.sendPacket(new EntityMetaDataPacket(entity.getEntityId(), getSelfPlayerEntries(entries)));
             player.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), entries));
-        } else entity.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), entries));
+        } else entity.sendPacketToViewersAndSelf(new EntityMetaDataPacket(entity.getEntityId(), entries));
     }
 
     public @NotNull Map<Integer, Entry<?>> getEntries() {
