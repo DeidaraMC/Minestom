@@ -38,7 +38,7 @@ public class ArrowMeta extends AbstractArrowMeta implements ObjectDataProvider, 
 
     @Override
     public int getObjectData() {
-        return this.shooter == null ? 0 : this.shooter.getEntityId(); 
+        return this.shooter == null ? 0 : this.shooter.getEntityId();
     }
 
     @Override
