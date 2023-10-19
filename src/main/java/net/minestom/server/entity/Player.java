@@ -1856,7 +1856,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
     public void setInfoEntryAudience(@NotNull Audience infoEntryAudience)
     {
-        this.infoEntryAudience = Audience.audience(this.infoEntryAudience, PacketGroupingAudience.of(List.of(this)));
+        this.infoEntryAudience = infoEntryAudience;
     }
 
     /**
