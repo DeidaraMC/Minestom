@@ -335,8 +335,8 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         final Pos currentPosition = this.position;
         if (currentPosition.sameView(yaw, pitch)) return;
         this.position = currentPosition.withView(yaw, pitch);
-        sendPacketToViewersAndSelf(new EntityHeadLookPacket(getEntityId(), yaw));
-        sendPacketToViewersAndSelf(new EntityRotationPacket(getEntityId(), yaw, pitch, onGround));
+        sendPacketToViewers(new EntityHeadLookPacket(getEntityId(), yaw));
+        sendPacketToViewers(new EntityRotationPacket(getEntityId(), yaw, pitch, onGround));
     }
 
     /**
