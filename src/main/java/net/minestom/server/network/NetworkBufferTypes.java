@@ -223,6 +223,21 @@ final class NetworkBufferTypes {
                 buffer.readIndex += length;
                 return new String(bytes, StandardCharsets.UTF_8);
             });
+    static final TypeImpl<char[]> CHAR_STRING = new TypeImpl<>(char[].class,
+            (buffer, value) -> {
+                final int bytes = value.length * 2;
+                buffer.write(VAR_INT, bytes);
+                buffer.ensureSize(bytes);
+                buffer.nioBuffer.asCharBuffer().put(buffer.readIndex(), value);
+                return -1;
+            },
+            buffer -> {
+                final int length = buffer.read(VAR_INT);
+                char[] chars = new char[length / 2];
+                buffer.nioBuffer.asCharBuffer().get(buffer.readIndex(), chars);
+                buffer.readIndex += length;
+                return chars;
+            });
     static final TypeImpl<NBT> NBT = new TypeImpl<>(NBT.class,
             (buffer, value) -> {
                 NBTWriter nbtWriter = buffer.nbtWriter;

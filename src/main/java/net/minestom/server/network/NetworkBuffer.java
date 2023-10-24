@@ -38,6 +38,7 @@ public final class NetworkBuffer {
     public static final Type<Long> VAR_LONG = NetworkBufferTypes.VAR_LONG;
     public static final Type<byte[]> RAW_BYTES = NetworkBufferTypes.RAW_BYTES;
     public static final Type<String> STRING = NetworkBufferTypes.STRING;
+    public static final Type<char[]> CHAR_STRING = NetworkBufferTypes.CHAR_STRING;
     public static final Type<NBT> NBT = NetworkBufferTypes.NBT;
     public static final Type<Point> BLOCK_POSITION = NetworkBufferTypes.BLOCK_POSITION;
     public static final Type<Component> COMPONENT = NetworkBufferTypes.COMPONENT;
