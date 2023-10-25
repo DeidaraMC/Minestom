@@ -171,7 +171,8 @@ public class DynamicChunk extends Chunk {
     @Override
     public @NotNull Chunk copy(@NotNull Instance instance, int chunkX, int chunkZ) {
         DynamicChunk dynamicChunk = new DynamicChunk(instance, chunkX, chunkZ);
-        dynamicChunk.sections = sections.stream().map(Section::clone).toList();
+        dynamicChunk.sections = new ArrayList<>(sections.size());
+        for (Section section : sections) dynamicChunk.sections.add(section.clone());
         dynamicChunk.entries.putAll(entries);
         return dynamicChunk;
     }
