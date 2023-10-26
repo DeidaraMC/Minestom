@@ -89,6 +89,12 @@ public sealed abstract class AbstractInventory implements InventoryClickHandler,
         safeItemInsert(slot, itemStack, true);
     }
 
+    public void UNSAFE_setItemStack(int slot, @NotNull ItemStack itemStack) {
+        ItemStack previous = itemStacks[slot];
+        if (itemStack.equals(previous)) return;
+        UNSAFE_itemInsert(slot, itemStack, true);
+    }
+
     protected abstract void UNSAFE_itemInsert(int slot, @NotNull ItemStack itemStack, boolean sendPacket);
 
     public synchronized <T> @NotNull T processItemStack(@NotNull ItemStack itemStack,
