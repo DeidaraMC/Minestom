@@ -32,6 +32,7 @@ import net.minestom.server.thread.ThreadDispatcher;
 import net.minestom.server.timer.Schedulable;
 import net.minestom.server.timer.Scheduler;
 import net.minestom.server.utils.ArrayUtils;
+import net.minestom.server.utils.NamespaceID;
 import net.minestom.server.utils.PacketUtils;
 import net.minestom.server.utils.chunk.ChunkCache;
 import net.minestom.server.utils.chunk.ChunkSupplier;
@@ -68,6 +69,7 @@ public abstract class Instance implements Block.Getter, Block.Setter,
     private boolean registered;
 
     private final DimensionType dimensionType;
+    private final String dimensionName;
 
     private final WorldBorder worldBorder;
 
@@ -111,10 +113,21 @@ public abstract class Instance implements Block.Getter, Block.Setter,
      * @param dimensionType the {@link DimensionType} of the instance
      */
     public Instance(@NotNull UUID uniqueId, @NotNull DimensionType dimensionType) {
+        this(uniqueId, dimensionType, dimensionType.getName());
+    }
+
+    /**
+     * Creates a new instance.
+     *
+     * @param uniqueId      the {@link UUID} of the instance
+     * @param dimensionType the {@link DimensionType} of the instance
+     */
+    public Instance(@NotNull UUID uniqueId, @NotNull DimensionType dimensionType, @NotNull NamespaceID dimensionName) {
         Check.argCondition(!dimensionType.isRegistered(),
                 "The dimension " + dimensionType.getName() + " is not registered! Please use DimensionTypeManager#addDimension");
         this.uniqueId = uniqueId;
         this.dimensionType = dimensionType;
+        this.dimensionName = dimensionName.asString();
 
         this.worldBorder = new WorldBorder(this);
 
@@ -140,8 +153,24 @@ public abstract class Instance implements Block.Getter, Block.Setter,
         this.scheduler.scheduleNextTick(() -> callback.accept(this));
     }
 
+    @Override
+    public void setBlock(int x, int y, int z, @NotNull Block block) {
+        setBlock(x, y, z, block, true);
+    }
+
+    public void setBlock(@NotNull Point blockPosition, @NotNull Block block, boolean doBlockUpdates) {
+        setBlock(blockPosition.blockX(), blockPosition.blockY(), blockPosition.blockZ(), block, doBlockUpdates);
+    }
+
+    public abstract void setBlock(int x, int y, int z, @NotNull Block block, boolean doBlockUpdates);
+
     @ApiStatus.Internal
-    public abstract boolean placeBlock(@NotNull BlockHandler.Placement placement);
+    public boolean placeBlock(@NotNull BlockHandler.Placement placement) {
+        return placeBlock(placement, true);
+    }
+
+    @ApiStatus.Internal
+    public abstract boolean placeBlock(@NotNull BlockHandler.Placement placement, boolean doBlockUpdates);
 
     /**
      * Does call {@link net.minestom.server.event.player.PlayerBlockBreakEvent}
@@ -152,7 +181,21 @@ public abstract class Instance implements Block.Getter, Block.Setter,
      * @return true if the block has been broken, false if it has been cancelled
      */
     @ApiStatus.Internal
-    public abstract boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition, @NotNull BlockFace blockFace);
+    public boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition, @NotNull BlockFace blockFace) {
+        return breakBlock(player, blockPosition, blockFace, true);
+    }
+
+    /**
+     * Does call {@link net.minestom.server.event.player.PlayerBlockBreakEvent}
+     * and send particle packets
+     *
+     * @param player        the {@link Player} who break the block
+     * @param blockPosition the position of the broken block
+     * @param doBlockUpdates true to do block updates, false otherwise
+     * @return true if the block has been broken, false if it has been cancelled
+     */
+    @ApiStatus.Internal
+    public abstract boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition, @NotNull BlockFace blockFace, boolean doBlockUpdates);
 
     /**
      * Forces the generation of a {@link Chunk}, even if no file and {@link ChunkGenerator} are defined.
@@ -324,9 +367,7 @@ public abstract class Instance implements Block.Getter, Block.Setter,
     public abstract boolean hasEnabledAutoChunkLoad();
 
     /**
-     * Determines whether a position in the void. If true, entities should take damage and die.
-     * <p>
-     * Always returning false allow entities to survive in the void.
+     * Determines whether a position in the void.
      *
      * @param point the point in the world
      * @return true if the point is inside the void
@@ -360,6 +401,14 @@ public abstract class Instance implements Block.Getter, Block.Setter,
      */
     public DimensionType getDimensionType() {
         return dimensionType;
+    }
+
+    /**
+     * Gets the instance dimension name.
+     * @return the dimension name of the instance
+     */
+    public @NotNull String getDimensionName() {
+        return dimensionName;
     }
 
     /**

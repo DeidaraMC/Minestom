@@ -54,6 +54,11 @@ public final class Registry {
     }
 
     @ApiStatus.Internal
+    public static DamageTypeEntry damageType(String namespace, @NotNull Properties main) {
+        return new DamageTypeEntry(namespace, main, null);
+    }
+
+    @ApiStatus.Internal
     public static Map<String, Map<String, Object>> load(Resource resource) {
         Map<String, Map<String, Object>> map = new HashMap<>();
         try (InputStream resourceStream = Registry.class.getClassLoader().getResourceAsStream(resource.name)) {
@@ -409,6 +414,23 @@ public final class Registry {
         }
     }
 
+    public record DamageTypeEntry(NamespaceID namespace, float exhaustion,
+                                  String messageId,
+                                  String scaling,
+                                  @Nullable String effects,
+                                  @Nullable String deathMessageType,
+                                  Properties custom) implements Entry {
+        public DamageTypeEntry(String namespace, Properties main, Properties custom) {
+            this(NamespaceID.from(namespace),
+                    (float) main.getDouble("exhaustion"),
+                    main.getString("message_id"),
+                    main.getString("scaling"),
+                    main.getString("effects"),
+                    main.getString("death_message_type"),
+                    custom);
+        }
+    }
+
     public record EnchantmentEntry(NamespaceID namespace, int id,
                                    String translationKey,
                                    double maxLevel,
@@ -422,10 +444,10 @@ public final class Registry {
                     main.getInt("id"),
                     main.getString("translationKey"),
                     main.getDouble("maxLevel"),
-                    main.getBoolean("isCursed", false),
-                    main.getBoolean("isDiscoverable", true),
-                    main.getBoolean("isTradeable", true),
-                    main.getBoolean("isTreasureOnly", false),
+                    main.getBoolean("curse", false),
+                    main.getBoolean("discoverable", true),
+                    main.getBoolean("tradeable", true),
+                    main.getBoolean("treasureOnly", false),
                     custom);
         }
     }

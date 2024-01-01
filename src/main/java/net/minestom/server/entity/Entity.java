@@ -103,7 +103,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
     protected Pos lastSyncedPosition;
     protected boolean onGround;
 
-    private BoundingBox boundingBox;
+    protected BoundingBox boundingBox;
     private PhysicsResult lastPhysicsResult = null;
 
     protected Entity vehicle;
@@ -162,7 +162,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
 
     protected UUID uuid;
     private boolean isActive; // False if entity has only been instanced without being added somewhere
-    private boolean removed;
+    protected boolean removed;
 
     private final Set<Entity> passengers = new CopyOnWriteArraySet<>();
     protected EntityType entityType; // UNSAFE to change, modify at your own risk
@@ -272,6 +272,13 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
 
     }
 
+    /**
+     * Called right before an entity is removed
+     */
+    protected void despawn() {
+
+    }
+
     public boolean isOnGround() {
         return onGround || EntityUtils.isOnGround(this) /* backup for levitating entities */;
     }
@@ -284,6 +291,21 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      */
     public @NotNull EntityMeta getEntityMeta() {
         return this.entityMeta;
+    }
+
+    /**
+     * Do a batch edit of this entity's metadata.
+     */
+    public <TMeta extends EntityMeta> void editEntityMeta(Class<TMeta> metaClass, Consumer<TMeta> editor) {
+        entityMeta.setNotifyAboutChanges(false);
+        try {
+            TMeta casted = metaClass.cast(entityMeta);
+            editor.accept(casted);
+        } catch (Throwable t) {
+            throw new RuntimeException("Error editing entity " + id + " " + entityType.name() + " meta", t);
+        } finally {
+            entityMeta.setNotifyAboutChanges(true);
+        }
     }
 
     /**
@@ -335,8 +357,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         final Pos currentPosition = this.position;
         if (currentPosition.sameView(yaw, pitch)) return;
         this.position = currentPosition.withView(yaw, pitch);
-        sendPacketToViewers(new EntityHeadLookPacket(getEntityId(), yaw));
-        sendPacketToViewers(new EntityRotationPacket(getEntityId(), yaw, pitch, onGround));
+        synchronizeView();
     }
 
     /**
@@ -539,8 +560,6 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
             // handle block contacts
             touchTick();
 
-            handleVoid();
-
             // Call the abstract update method
             update(time);
 
@@ -727,16 +746,6 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      */
     public long getAliveTicks() {
         return ticks;
-    }
-
-    /**
-     * How does this entity handle being in the void?
-     */
-    protected void handleVoid() {
-        // Kill if in void
-        if (getInstance().isInVoid(this.position)) {
-            remove();
-        }
     }
 
     /**
@@ -1339,7 +1348,8 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
             var packet = NEVER_SEND_ROTATION_ONLY ? EntityPositionAndRotationPacket.getPacket(getEntityId(), position, lastSyncedPosition, isOnGround()) :
                     new EntityRotationPacket(getEntityId(), position.yaw(), position.pitch(), onGround);
             PacketUtils.prepareViewablePacket(chunk, new EntityHeadLookPacket(getEntityId(), position.yaw()), this);
-            PacketUtils.prepareViewablePacket(chunk, packet, this);
+            PacketUtils.prepareViewablePacket(chunk, EntityPositionAndRotationPacket.getPacket(getEntityId(), position,
+                    lastSyncedPosition, isOnGround()), this);
         }
         this.lastSyncedPosition = position;
     }
@@ -1473,6 +1483,36 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
     }
 
     /**
+     * If the entity has the specified effect.
+     *
+     * @param effect the effect to check
+     */
+    public boolean hasEffect(@NotNull PotionEffect effect) {
+        return this.effects.stream().anyMatch(timedPotion -> timedPotion.getPotion().effect() == effect);
+    }
+
+    /**
+     * Gets the TimedPotion of the specified effect.
+     *
+     * @param effect the effect type
+     * @return the effect, null if not found
+     */
+    public @Nullable TimedPotion getEffect(@NotNull PotionEffect effect) {
+        return this.effects.stream().filter(timedPotion -> timedPotion.getPotion().effect() == effect).findFirst().orElse(null);
+    }
+
+    /**
+     * Gets the level of the specified effect.
+     *
+     * @param effect the effect type
+     * @return the effect level, 0 if not found
+     */
+    public int getEffectLevel(@NotNull PotionEffect effect) {
+        TimedPotion timedPotion = getEffect(effect);
+        return timedPotion == null ? 0 : timedPotion.getPotion().amplifier();
+    }
+
+    /**
      * Removes all the effects currently applied to the entity.
      */
     public void clearEffects() {
@@ -1489,18 +1529,41 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
      * WARNING: this does not trigger {@link EntityDeathEvent}.
      */
     public void remove() {
+        remove(true);
+    }
+
+    protected void remove(boolean permanent) {
         if (isRemoved()) return;
+        EventDispatcher.call(new EntityDespawnEvent(this));
+        try {
+            despawn();
+        } catch (Throwable t) {
+            MinecraftServer.getExceptionManager().handleException(t);
+        }
+
         // Remove passengers if any (also done with LivingEntity#kill)
         Set<Entity> passengers = getPassengers();
         if (!passengers.isEmpty()) passengers.forEach(this::removePassenger);
         final Entity vehicle = this.vehicle;
         if (vehicle != null) vehicle.removePassenger(this);
+
         MinecraftServer.process().dispatcher().removeElement(this);
         this.removed = true;
-        Entity.ENTITY_BY_ID.remove(id);
-        Entity.ENTITY_BY_UUID.remove(uuid);
+        if (permanent) {
+            Entity.ENTITY_BY_ID.remove(id);
+            Entity.ENTITY_BY_UUID.remove(uuid);
+        } else {
+            // Reset some other state
+            this.position = Pos.ZERO;
+            this.previousPosition = Pos.ZERO;
+            this.lastSyncedPosition = Pos.ZERO;
+        }
         Instance currentInstance = this.instance;
-        if (currentInstance != null) removeFromInstance(currentInstance);
+        if (currentInstance != null) {
+            removeFromInstance(currentInstance);
+            this.instance = null;
+        }
+
     }
 
     /**
@@ -1573,6 +1636,11 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         PacketUtils.prepareViewablePacket(currentChunk, packet, this);
         this.lastAbsoluteSynchronizationTime = System.currentTimeMillis();
         this.lastSyncedPosition = posCache;
+    }
+
+    private void synchronizeView() {
+        sendPacketToViewersAndSelf(new EntityHeadLookPacket(getEntityId(), position.yaw()));
+        sendPacketToViewersAndSelf(new EntityRotationPacket(getEntityId(), position.yaw(), position.pitch(), onGround));
     }
 
     /**
@@ -1775,6 +1843,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         DYING,
         CROAKING,
         USING_TONGUE,
+        SITTING,
         ROARING,
         SNIFFING,
         EMERGING,

@@ -5,7 +5,6 @@ import net.minestom.server.ServerProcess;
 import net.minestom.server.adventure.MinestomAdventure;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.entity.Player;
-import net.minestom.server.event.player.PlayerLoginEvent;
 import net.minestom.server.instance.Instance;
 import net.minestom.server.network.packet.server.ComponentHoldingServerPacket;
 import net.minestom.server.network.packet.server.SendablePacket;
@@ -41,7 +40,7 @@ final class TestConnectionImpl implements TestConnection {
             event.getPlayer().setRespawnPoint(pos);
         });
 
-        return process.connection().startPlayState(player, true)
+        return process.connection().createPlayer(player, true)
                 .thenApply(unused -> {
                     process.connection().updateWaitingPlayers();
                     return player;
@@ -65,7 +64,7 @@ final class TestConnectionImpl implements TestConnection {
         }
 
         private ServerPacket extractPacket(final SendablePacket packet) {
-            if (!(packet instanceof ServerPacket serverPacket)) return SendablePacket.extractServerPacket(packet);
+            if (!(packet instanceof ServerPacket serverPacket)) return SendablePacket.extractServerPacket(getConnectionState(), packet);
 
             final Player player = getPlayer();
             if (player == null) return serverPacket;

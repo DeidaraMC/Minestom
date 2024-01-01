@@ -2,6 +2,7 @@ package net.minestom.demo;
 
 import net.kyori.adventure.text.Component;
 import net.minestom.server.MinecraftServer;
+import net.minestom.server.adventure.MinestomAdventure;
 import net.minestom.server.adventure.audience.Audiences;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.coordinate.Vec;
@@ -9,7 +10,7 @@ import net.minestom.server.entity.Entity;
 import net.minestom.server.entity.GameMode;
 import net.minestom.server.entity.ItemEntity;
 import net.minestom.server.entity.Player;
-import net.minestom.server.entity.damage.DamageType;
+import net.minestom.server.entity.damage.Damage;
 import net.minestom.server.event.Event;
 import net.minestom.server.event.EventNode;
 import net.minestom.server.event.entity.EntityAttackEvent;
@@ -27,13 +28,12 @@ import net.minestom.server.item.metadata.BundleMeta;
 import net.minestom.server.monitoring.BenchmarkManager;
 import net.minestom.server.monitoring.TickMonitor;
 import net.minestom.server.utils.MathUtils;
-import net.minestom.server.utils.chunk.ChunkUtils;
+import net.minestom.server.utils.NamespaceID;
 import net.minestom.server.utils.time.TimeUnit;
 import net.minestom.server.world.DimensionType;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -50,7 +50,7 @@ public class PlayerInit {
 
                 if (entity instanceof Player) {
                     Player target = (Player) entity;
-                    target.damage(DamageType.fromEntity(source), 5);
+                    target.damage(Damage.fromEntity(source, 5));
                 }
 
                 if (source instanceof Player) {
@@ -78,7 +78,7 @@ public class PlayerInit {
                 itemEntity.setVelocity(velocity);
             })
             .addListener(PlayerDisconnectEvent.class, event -> System.out.println("DISCONNECTION " + event.getPlayer().getUsername()))
-            .addListener(PlayerLoginEvent.class, event -> {
+            .addListener(AsyncPlayerConfigurationEvent.class, event -> {
                 final Player player = event.getPlayer();
 
                 var instances = MinecraftServer.getInstanceManager().getInstances();
@@ -132,6 +132,17 @@ public class PlayerInit {
 
                 event.getInstance().setBlock(event.getPosition(), block);
 
+            })
+            .addListener(PlayerBlockPlaceEvent.class, event -> {
+//                event.setDoBlockUpdates(false);
+            })
+            .addListener(PlayerBlockInteractEvent.class, event -> {
+                var block = event.getBlock();
+                var rawOpenProp = block.getProperty("open");
+                if (rawOpenProp == null) return;
+
+                block = block.withProperty("open", String.valueOf(!Boolean.parseBoolean(rawOpenProp)));
+                event.getInstance().setBlock(event.getBlockPosition(), block);
             });
 
     static {
@@ -140,6 +151,11 @@ public class PlayerInit {
         InstanceContainer instanceContainer = instanceManager.createInstanceContainer(DimensionType.OVERWORLD);
         instanceContainer.setGenerator(unit -> unit.modifier().fillHeight(0, 40, Block.STONE));
         instanceContainer.setChunkSupplier(LightingChunk::new);
+
+        var i2 = new InstanceContainer(UUID.randomUUID(), DimensionType.OVERWORLD, null, NamespaceID.from("minestom:demo"));
+        instanceManager.registerInstance(i2);
+        i2.setGenerator(unit -> unit.modifier().fillHeight(0, 40, Block.GRASS_BLOCK));
+        i2.setChunkSupplier(LightingChunk::new);
 
         // System.out.println("start");
         // var chunks = new ArrayList<CompletableFuture<Chunk>>();
@@ -160,12 +176,14 @@ public class PlayerInit {
         var eventHandler = MinecraftServer.getGlobalEventHandler();
         eventHandler.addChild(DEMO_NODE);
 
+        MinestomAdventure.AUTOMATIC_COMPONENT_TRANSLATION = true;
+        MinestomAdventure.COMPONENT_TRANSLATOR = (c, l) -> c;
+
         eventHandler.addListener(ServerTickMonitorEvent.class, event -> LAST_TICK.set(event.getTickMonitor()));
 
         BenchmarkManager benchmarkManager = MinecraftServer.getBenchmarkManager();
         MinecraftServer.getSchedulerManager().buildTask(() -> {
-            Collection<Player> players = MinecraftServer.getConnectionManager().getOnlinePlayers();
-            if (players.isEmpty())
+            if (MinecraftServer.getConnectionManager().getOnlinePlayerCount() != 0)
                 return;
 
             long ramUsage = benchmarkManager.getUsedMemory();
@@ -179,6 +197,6 @@ public class PlayerInit {
                     .append(Component.text("ACQ TIME: " + MathUtils.round(tickMonitor.getAcquisitionTime(), 2) + "ms"));
             final Component footer = benchmarkManager.getCpuMonitoringMessage();
             Audiences.players().sendPlayerListHeaderAndFooter(header, footer);
-        }).repeat(10, TimeUnit.SERVER_TICK).schedule();
+        }).repeat(10, TimeUnit.SERVER_TICK); //.schedule();
     }
 }
