@@ -306,10 +306,10 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         this.skin = skinInitEvent.getSkin();
         // FIXME: when using Geyser, this line remove the skin of the client
         if (onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, getAddPlayerToList());
-        else PacketUtils.broadcastPacket(getAddPlayerToList());
+        else PacketUtils.broadcastPlayPacket(getAddPlayerToList());
 
         if (displayName != null && onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
-        else if (displayName != null) PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
+        else if (displayName != null) PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
         if (!onlySendInfoEntriesToAudience) {
             for (var player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
                 if (player != this) {
@@ -591,7 +591,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         ChunkUtils.forChunksInRange(chunkX, chunkZ, MinecraftServer.getChunkViewDistance(), chunkRemover);
         // Remove from the tab-list
         if (onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, getRemovePlayerToList());
-        else PacketUtils.broadcastPacket(getRemovePlayerToList());
+        else PacketUtils.broadcastPlayPacket(getRemovePlayerToList());
 
         // Prevent the player from being stuck in loading screen, or just unable to interact with the server
         // This should be considered as a bug, since the player will ultimately time out anyway.
@@ -1095,7 +1095,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     public void setDisplayName(@Nullable Component displayName) {
         this.displayName = displayName;
         if (onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
-        else PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
+        else PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
     }
 
     /**
@@ -1138,12 +1138,12 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         {
             // Remove player
             if (onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, removePlayerPacket);
-            else PacketUtils.broadcastPacket(removePlayerPacket);
+            else PacketUtils.broadcastPlayPacket(removePlayerPacket);
             sendPacketToViewers(destroyEntitiesPacket);
 
             // Show player again
             if (onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, addPlayerPacket);
-            else PacketUtils.broadcastPacket(addPlayerPacket);
+            else PacketUtils.broadcastPlayPacket(addPlayerPacket);
             getViewers().forEach(player -> showPlayer(player.getPlayerConnection()));
         }
 
@@ -1479,7 +1479,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         if (isActive()) {
             sendPacket(new ChangeGameStatePacket(ChangeGameStatePacket.Reason.CHANGE_GAMEMODE, gameMode.id()));
             if (onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, infoEntry()));
-            else PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, infoEntry()));
+            else PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, infoEntry()));
         }
 
         // The client updates their abilities based on the GameMode as follows
@@ -1999,7 +1999,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         this.latency = latency;
         if (getPlayerConnection().getServerState() == ConnectionState.PLAY) {
             if (onlySendInfoEntriesToAudience) PacketUtils.sendPacket(infoEntryAudience, new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_LATENCY, infoEntry()));
-            else PacketUtils.broadcastPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_LATENCY, infoEntry()));
+            else PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_LATENCY, infoEntry()));
         }
     }
 
