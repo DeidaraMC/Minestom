@@ -35,16 +35,12 @@ final class TestConnectionImpl implements TestConnection {
     @Override
     public @NotNull CompletableFuture<Player> connect(@NotNull Instance instance, @NotNull Pos pos) {
         Player player = new Player(UUID.randomUUID(), "RandName", playerConnection);
-        player.eventNode().addListener(PlayerLoginEvent.class, event -> {
+        player.eventNode().addListener(net.minestom.server.event.player.AsyncPlayerConfigurationEvent.class, event -> {
             event.setSpawningInstance(instance);
             event.getPlayer().setRespawnPoint(pos);
         });
 
-        return process.connection().createPlayer(player, true)
-                .thenApply(unused -> {
-                    process.connection().updateWaitingPlayers();
-                    return player;
-                });
+        return CompletableFuture.completedFuture(process.connection().createPlayer(player.getPlayerConnection(), player.getUuid(), player.getUsername()));
     }
 
     @Override
@@ -64,7 +60,7 @@ final class TestConnectionImpl implements TestConnection {
         }
 
         private ServerPacket extractPacket(final SendablePacket packet) {
-            if (!(packet instanceof ServerPacket serverPacket)) return SendablePacket.extractServerPacket(getConnectionState(), packet);
+            if (!(packet instanceof ServerPacket serverPacket)) return SendablePacket.extractServerPacket(getServerState(), packet);
 
             final Player player = getPlayer();
             if (player == null) return serverPacket;
