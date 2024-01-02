@@ -1,29 +1,21 @@
-package net.minestom.server.entity.metadata.other;
+package net.minestom.server.entity.metadata.projectile;
 
 import net.minestom.server.entity.Entity;
 import net.minestom.server.entity.Metadata;
 import net.minestom.server.entity.metadata.EntityMeta;
 import net.minestom.server.entity.metadata.ObjectDataProvider;
-import net.minestom.server.entity.metadata.ProjectileMeta;
+import net.minestom.server.entity.metadata.projectile.ProjectileMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class WitherSkullMeta extends EntityMeta implements ObjectDataProvider, ProjectileMeta {
+public class DragonFireballMeta extends EntityMeta implements ObjectDataProvider, ProjectileMeta {
     public static final byte OFFSET = EntityMeta.MAX_OFFSET;
-    public static final byte MAX_OFFSET = OFFSET + 1;
+    public static final byte MAX_OFFSET = OFFSET + 0;
 
     private Entity shooter;
 
-    public WitherSkullMeta(@NotNull Entity entity, @NotNull Metadata metadata) {
+    public DragonFireballMeta(@NotNull Entity entity, @NotNull Metadata metadata) {
         super(entity, metadata);
-    }
-
-    public boolean isInvulnerable() {
-        return super.metadata.getIndex(OFFSET, false);
-    }
-
-    public void setInvulnerable(boolean value) {
-        super.metadata.setIndex(OFFSET, Metadata.Boolean(value));
     }
 
     @Override

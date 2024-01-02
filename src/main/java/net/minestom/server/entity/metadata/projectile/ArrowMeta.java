@@ -1,27 +1,33 @@
-package net.minestom.server.entity.metadata.other;
+package net.minestom.server.entity.metadata.projectile;
 
 import net.minestom.server.entity.Entity;
 import net.minestom.server.entity.Metadata;
-import net.minestom.server.entity.metadata.EntityMeta;
 import net.minestom.server.entity.metadata.ObjectDataProvider;
-import net.minestom.server.entity.metadata.ProjectileMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class DragonFireballMeta extends EntityMeta implements ObjectDataProvider, ProjectileMeta {
-    public static final byte OFFSET = EntityMeta.MAX_OFFSET;
-    public static final byte MAX_OFFSET = OFFSET + 0;
+public class ArrowMeta extends AbstractArrowMeta implements ObjectDataProvider, ProjectileMeta {
+    public static final byte OFFSET = AbstractArrowMeta.MAX_OFFSET;
+    public static final byte MAX_OFFSET = OFFSET + 1;
 
     private Entity shooter;
 
-    public DragonFireballMeta(@NotNull Entity entity, @NotNull Metadata metadata) {
+    public ArrowMeta(@NotNull Entity entity, @NotNull Metadata metadata) {
         super(entity, metadata);
+    }
+
+    public int getColor() {
+        return super.metadata.getIndex(OFFSET, -1);
+    }
+
+    public void setColor(int value) {
+        super.metadata.setIndex(OFFSET, Metadata.VarInt(value));
     }
 
     @Override
     @Nullable
     public Entity getShooter() {
-        return shooter;
+        return this.shooter;
     }
 
     @Override
