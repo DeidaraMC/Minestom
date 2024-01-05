@@ -9,9 +9,9 @@ import org.jetbrains.annotations.NotNull;
 
 import static net.minestom.server.network.NetworkBuffer.*;
 
-public record TickStatePacket(float tickRate, boolean isFrozen) implements ServerPacket {
+public record SetTickStatePacket(float tickRate, boolean isFrozen) implements ServerPacket {
 
-    public TickStatePacket(@NotNull NetworkBuffer reader) {
+    public SetTickStatePacket(@NotNull NetworkBuffer reader) {
         this(reader.read(FLOAT), reader.read(BOOLEAN));
     }
 
