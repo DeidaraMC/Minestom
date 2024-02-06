@@ -201,10 +201,9 @@ public final class Metadata {
                 synchronized (this.notNotifiedChanges) {
                     this.notNotifiedChanges.put(index, entry);
                 }
-            } else if (entity instanceof Player player && player.getTag(EntityTags.SETTING_SNEAKING)) {
-                player.sendPacket(new EntityMetaDataPacket(entity.getEntityId(), getSelfPlayerEntries(Map.of(index, entry))));
-                player.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), Map.of(index, entry)));
-            } else entity.sendPacketToViewersAndSelf(new EntityMetaDataPacket(entity.getEntityId(), Map.of(index, entry)));
+            } else {
+                entity.sendPacketToViewersAndSelf(new EntityMetaDataPacket(entity.getEntityId(), Map.of(index, entry)));
+            }
         }
     }
 
@@ -224,10 +223,7 @@ public final class Metadata {
             entries = Map.copyOf(awaitingChanges);
             awaitingChanges.clear();
         }
-        if (entity instanceof Player player && player.getTag(EntityTags.SETTING_SNEAKING)) {
-            player.sendPacket(new EntityMetaDataPacket(entity.getEntityId(), getSelfPlayerEntries(entries)));
-            player.sendPacketToViewers(new EntityMetaDataPacket(entity.getEntityId(), entries));
-        } else entity.sendPacketToViewersAndSelf(new EntityMetaDataPacket(entity.getEntityId(), entries));
+        entity.sendPacketToViewersAndSelf(new EntityMetaDataPacket(entity.getEntityId(), entries));
     }
 
     public @NotNull Map<Integer, Entry<?>> getEntries() {
