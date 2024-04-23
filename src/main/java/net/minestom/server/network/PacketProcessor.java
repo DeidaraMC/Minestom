@@ -4,6 +4,7 @@ import net.minestom.server.entity.Player;
 import net.minestom.server.listener.manager.PacketListenerManager;
 import net.minestom.server.network.packet.client.ClientPacket;
 import net.minestom.server.network.packet.client.ClientPacketsHandler;
+import net.minestom.server.network.packet.client.common.ClientKeepAlivePacket;
 import net.minestom.server.network.packet.client.handshake.ClientHandshakePacket;
 import net.minestom.server.network.player.PlayerConnection;
 import org.jetbrains.annotations.NotNull;
@@ -59,7 +60,10 @@ public class PacketProcessor {
             case CONFIGURATION, PLAY -> {
                 final Player player = connection.getPlayer();
                 assert player != null;
-                player.addPacketToQueue(packet);
+                if (packet instanceof ClientKeepAlivePacket) {
+                    packetListenerManager.processClientPacket(packet, connection);
+                }
+                else player.addPacketToQueue(packet);
             }
         }
         return packet;
