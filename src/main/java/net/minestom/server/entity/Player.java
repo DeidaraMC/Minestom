@@ -2466,9 +2466,17 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         this.restrictInfoEntryViewers = restrictInfoEntryViewers;
     }
 
+    public boolean restrictInfoEntryViewers() {
+        return restrictInfoEntryViewers;
+    }
+
     public void setInfoEntryViewers(@NotNull List<Player> infoEntryViewers) {
         if (!infoEntryViewers.contains(this)) infoEntryViewers.add(this);
         this.infoEntryViewers = infoEntryViewers;
+    }
+
+    public @NotNull List<Player> getInfoEntryViewers() {
+        return infoEntryViewers;
     }
 
     /**
