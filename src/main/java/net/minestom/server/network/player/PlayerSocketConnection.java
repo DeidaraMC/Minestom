@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.DataFormatException;
 
@@ -69,6 +70,7 @@ public class PlayerSocketConnection extends PlayerConnection {
     private BinaryBuffer cacheBuffer;
 
     private final ListenerHandle<PlayerPacketOutEvent> outgoing = EventDispatcher.getHandle(PlayerPacketOutEvent.class);
+    private final List<InboundPacketListener> inboundPacketListeners = new CopyOnWriteArrayList<>();
 
     public PlayerSocketConnection(@NotNull Worker worker, @NotNull SocketChannel channel, SocketAddress remoteAddress) {
         super();
@@ -101,6 +103,9 @@ public class PlayerSocketConnection extends PlayerConnection {
                         ClientPacket packet = null;
                         try {
                             packet = packetProcessor.process(this, id, payload);
+                            for (InboundPacketListener listener : inboundPacketListeners) {
+                                listener.onInboundPacketProcessed(packet);
+                            }
                         } catch (Exception e) {
                             // Error while reading the packet
                             MinecraftServer.getExceptionManager().handleException(e);
@@ -387,6 +392,14 @@ public class PlayerSocketConnection extends PlayerConnection {
                 POOL.add(waitingBuffer);
             }
         }
+    }
+
+    public void registerInboundPacketListener(InboundPacketListener listener) {
+        inboundPacketListeners.add(listener);
+    }
+
+    public void unregisterInboundPacketListener(InboundPacketListener listener) {
+        inboundPacketListeners.remove(listener);
     }
 
     private BinaryBuffer updateLocalBuffer() {
