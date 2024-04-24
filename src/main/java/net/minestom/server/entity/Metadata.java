@@ -101,7 +101,18 @@ public final class Metadata {
     }
 
     public static Entry<Integer> OptVarInt(@Nullable Integer value) {
-        return new MetadataImpl.EntryImpl<>(TYPE_OPTVARINT, value, NetworkBuffer.OPT_VAR_INT);
+        return new MetadataImpl.EntryImpl<>(TYPE_OPTVARINT, value, new NetworkBuffer.Type<>() {
+            @Override
+            public void write(@NotNull NetworkBuffer buffer, Integer value) {
+                buffer.write(NetworkBuffer.VAR_INT, value == null ? 0 : value + 1);
+            }
+
+            @Override
+            public Integer read(@NotNull NetworkBuffer buffer) {
+                int value = buffer.read(NetworkBuffer.VAR_INT);
+                return value == 0 ? null : value - 1;
+            }
+        });
     }
 
     public static Entry<Entity.Pose> Pose(@NotNull Entity.Pose value) {
