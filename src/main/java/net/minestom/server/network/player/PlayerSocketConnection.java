@@ -322,7 +322,7 @@ public class PlayerSocketConnection extends PlayerConnection {
         }
     }
 
-    private void writeServerPacketSync(ServerPacket serverPacket, boolean compressed) {
+    public void writeServerPacketSync(ServerPacket serverPacket, boolean compressed) {
         final Player player = getPlayer();
         if (player != null) {
             if (MinestomAdventure.AUTOMATIC_COMPONENT_TRANSLATION && serverPacket instanceof ServerPacket.ComponentHolding) {
