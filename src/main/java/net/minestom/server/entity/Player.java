@@ -516,7 +516,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
             return;
 
         setFireTicks(0);
-        setOnFire(false);
+        entityMeta.setOnFire(false);
         refreshHealth();
 
         sendPacket(new RespawnPacket(getDimensionType().toString(), instance.getDimensionName(),
