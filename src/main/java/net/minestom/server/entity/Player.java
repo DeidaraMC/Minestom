@@ -515,7 +515,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         if (!isDead())
             return;
 
-        setFireForDuration(0);
+        setFireTicks(0);
         setOnFire(false);
         refreshHealth();
 
