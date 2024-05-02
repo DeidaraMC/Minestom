@@ -275,12 +275,6 @@ final class ServerProcessImpl implements ServerProcess {
 
             scheduler().processTickEnd();
 
-            // Flush all waiting packets
-            PacketUtils.flush();
-
-            // Server connection tick
-            server().tick();
-
             // Monitoring
             {
                 final double acquisitionTimeMs = Acquirable.resetAcquiringTime() / 1e6D;
@@ -288,6 +282,12 @@ final class ServerProcessImpl implements ServerProcess {
                 final TickMonitor tickMonitor = new TickMonitor(tickTimeMs, acquisitionTimeMs);
                 EventDispatcher.call(new ServerTickMonitorEvent(tickMonitor));
             }
+
+            // Flush all waiting packets
+            PacketUtils.flush();
+
+            // Server connection tick
+            server().tick();
         }
 
         private void serverTick(long tickStart) {
