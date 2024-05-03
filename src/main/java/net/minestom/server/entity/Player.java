@@ -745,6 +745,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
             // Load the nearby chunks and queue them to be sent to them
             ChunkUtils.forChunksInRange(spawnPosition, settings.getEffectiveViewDistance(), chunkAdder);
+            sendPendingChunks();
         }
 
         synchronizePositionAfterTeleport(spawnPosition, 0); // So the player doesn't get stuck
