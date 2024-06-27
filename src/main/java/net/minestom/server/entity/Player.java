@@ -139,6 +139,8 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
     private long lastKeepAlive;
     private boolean answerKeepAlive;
+    private boolean restrictInfoEntryViewers = false;
+    private List<Player> infoEntryViewers = new ArrayList<>();
 
     private String username;
     private Component usernameComponent;
@@ -276,6 +278,15 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         metadata.setNotifyAboutChanges(false);
     }
 
+    public void setRestrictInfoEntryViewers(boolean restrictInfoEntryViewers) {
+        this.restrictInfoEntryViewers = restrictInfoEntryViewers;
+    }
+
+    public void setInfoEntryViewers(@NotNull List<Player> infoEntryViewers) {
+        if (!infoEntryViewers.contains(this)) infoEntryViewers.add(this);
+        this.infoEntryViewers = infoEntryViewers;
+    }
+
     @ApiStatus.Internal
     public void setPendingOptions(@NotNull Instance pendingInstance, boolean hardcore) {
         // I(mattw) am not a big fan of this function, but somehow we need to store
@@ -332,13 +343,17 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         EventDispatcher.call(skinInitEvent);
         this.skin = skinInitEvent.getSkin();
         // FIXME: when using Geyser, this line remove the skin of the client
-        PacketUtils.broadcastPlayPacket(getAddPlayerToList());
+        for (Player player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
+            if (!restrictInfoEntryViewers || infoEntryViewers.contains(player)) {
+                player.sendPacket(getAddPlayerToList());
+            }
+        }
 
         var connectionManager = MinecraftServer.getConnectionManager();
         for (var player : connectionManager.getOnlinePlayers()) {
             if (player != this) {
                 sendPacket(player.getAddPlayerToList());
-                if (player.displayName != null) {
+                if (player.displayName != null && (!restrictInfoEntryViewers || infoEntryViewers.contains(player))) {
                     sendPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, player.infoEntry()));
                 }
             }
@@ -1181,7 +1196,11 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
      */
     public void setDisplayName(@Nullable Component displayName) {
         this.displayName = displayName;
-        PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
+        for (Player player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
+            if (!restrictInfoEntryViewers || infoEntryViewers.contains(player)) {
+                player.sendPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME, infoEntry()));
+            }
+        }
     }
 
     /**
@@ -1223,11 +1242,19 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
         {
             // Remove player
-            PacketUtils.broadcastPlayPacket(removePlayerPacket);
+            for (Player player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
+                if (!restrictInfoEntryViewers || infoEntryViewers.contains(player)) {
+                    player.sendPacket(removePlayerPacket);
+                }
+            }
             sendPacketToViewers(destroyEntitiesPacket);
 
             // Show player again
-            PacketUtils.broadcastPlayPacket(addPlayerPacket);
+            for (Player player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
+                if (!restrictInfoEntryViewers || infoEntryViewers.contains(player)) {
+                    player.sendPacket(addPlayerPacket);
+                }
+            }
             getViewers().forEach(player -> showPlayer(player.getPlayerConnection()));
         }
 
@@ -1611,7 +1638,11 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
         // Condition to prevent sending the packets before spawning the player
         if (isActive()) {
             sendPacket(new ChangeGameStatePacket(ChangeGameStatePacket.Reason.CHANGE_GAMEMODE, gameMode.id()));
-            PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, infoEntry()));
+            for (Player player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
+                if (!restrictInfoEntryViewers || infoEntryViewers.contains(player)) {
+                    PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, infoEntry()));
+                }
+            }
         }
 
         // The client updates their abilities based on the GameMode as follows
@@ -2149,7 +2180,11 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     public void refreshLatency(int latency) {
         this.latency = latency;
         if (getPlayerConnection().getConnectionState() == ConnectionState.PLAY) {
-            PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_LATENCY, infoEntry()));
+            for (Player player : MinecraftServer.getConnectionManager().getOnlinePlayers()) {
+                if (!restrictInfoEntryViewers || infoEntryViewers.contains(player)) {
+                    PacketUtils.broadcastPlayPacket(new PlayerInfoUpdatePacket(PlayerInfoUpdatePacket.Action.UPDATE_LATENCY, infoEntry()));
+                }
+            }
         }
     }
 
@@ -2159,6 +2194,14 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
             this.setFlyingWithElytra(false);
             EventDispatcher.call(new PlayerStopFlyingWithElytraEvent(this));
         }
+    }
+
+    public boolean restrictInfoEntryViewers() {
+        return restrictInfoEntryViewers;
+    }
+
+    public @NotNull List<Player> getInfoEntryViewers() {
+        return infoEntryViewers;
     }
 
     /**

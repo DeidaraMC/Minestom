@@ -936,6 +936,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         // Updates the position of the new passenger, and then teleports the passenger
         updatePassengerPosition(position, entity);
         entity.synchronizePosition();
+        EventDispatcher.call(new EntityPassengerEvent(entity, this, false));
     }
 
     /**
@@ -951,6 +952,7 @@ public class Entity implements Viewable, Tickable, Schedulable, Snapshotable, Ev
         entity.vehicle = null;
         sendPacketToViewersAndSelf(getPassengersPacket());
         entity.synchronizePosition();
+        EventDispatcher.call(new EntityPassengerEvent(entity, this, true));
     }
 
     /**

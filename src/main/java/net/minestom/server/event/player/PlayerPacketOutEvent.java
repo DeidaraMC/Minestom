@@ -16,11 +16,13 @@ import org.jetbrains.annotations.NotNull;
 public class PlayerPacketOutEvent implements PlayerEvent, CancellableEvent {
     private final Player player;
     private final ServerPacket packet;
+    private ServerPacket sentPacket;
     private boolean cancelled;
 
     public PlayerPacketOutEvent(Player player, ServerPacket packet) {
         this.player = player;
         this.packet = packet;
+        this.sentPacket = packet;
     }
 
     @Override
@@ -31,7 +33,13 @@ public class PlayerPacketOutEvent implements PlayerEvent, CancellableEvent {
     public @NotNull ServerPacket getPacket() {
         return packet;
     }
+    public @NotNull ServerPacket getSentPacket() {
+        return sentPacket;
+    }
 
+    public void changeSentPacket(@NotNull ServerPacket packet) {
+        this.sentPacket = packet;
+    }
     @Override
     public boolean isCancelled() {
         return cancelled;

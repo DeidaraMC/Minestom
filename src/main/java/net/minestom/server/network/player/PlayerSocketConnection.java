@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.DataFormatException;
 
@@ -45,7 +46,7 @@ import java.util.zip.DataFormatException;
 public class PlayerSocketConnection extends PlayerConnection {
     private final static Logger LOGGER = LoggerFactory.getLogger(PlayerSocketConnection.class);
     private static final ObjectPool<BinaryBuffer> POOL = ObjectPool.BUFFER_POOL;
-
+    private final List<InboundPacketListener> inboundPacketListeners = new CopyOnWriteArrayList<>();
     private final Worker worker;
     private final MessagePassingQueue<Runnable> workerQueue;
     private final SocketChannel channel;
@@ -101,6 +102,9 @@ public class PlayerSocketConnection extends PlayerConnection {
                         ClientPacket packet = null;
                         try {
                             packet = packetProcessor.process(this, id, payload);
+                            for (InboundPacketListener listener : inboundPacketListeners) {
+                                listener.onInboundPacketProcessed(packet);
+                            }
                         } catch (Exception e) {
                             // Error while reading the packet
                             MinecraftServer.getExceptionManager().handleException(e);
@@ -298,6 +302,7 @@ public class PlayerSocketConnection extends PlayerConnection {
             PlayerPacketOutEvent event = new PlayerPacketOutEvent(player, serverPacket);
             outgoing.call(event);
             if (event.isCancelled()) return;
+            packet = event.getSentPacket();
         }
         // Write packet
         if (packet instanceof ServerPacket serverPacket) {
@@ -396,5 +401,13 @@ public class PlayerSocketConnection extends PlayerConnection {
     }
 
     record EncryptionContext(Cipher encrypt, Cipher decrypt) {
+    }
+
+    public void registerInboundPacketListener(InboundPacketListener listener) {
+        inboundPacketListeners.add(listener);
+    }
+
+    public void unregisterInboundPacketListener(InboundPacketListener listener) {
+        inboundPacketListeners.remove(listener);
     }
 }
