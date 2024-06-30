@@ -3,6 +3,8 @@ package net.minestom.server;
 import net.kyori.adventure.audience.Audience;
 import net.minestom.server.adventure.audience.PacketGroupingAudience;
 import net.minestom.server.entity.Player;
+import net.minestom.server.event.EventDispatcher;
+import net.minestom.server.event.player.SyncViewableSendPacketEvent;
 import net.minestom.server.network.packet.server.SendablePacket;
 import net.minestom.server.network.packet.server.ServerPacket;
 import net.minestom.server.utils.PacketUtils;
@@ -59,6 +61,9 @@ public interface Viewable {
      * @param packet the packet to send to all viewers
      */
     default void sendPacketToViewers(@NotNull SendablePacket packet) {
+        SyncViewableSendPacketEvent event = new SyncViewableSendPacketEvent(this, packet);
+        EventDispatcher.call(event);
+        if (event.isCancelled()) return;
         if (packet instanceof ServerPacket serverPacket) {
             PacketUtils.sendGroupedPacket(getViewers(), serverPacket);
         } else {

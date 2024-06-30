@@ -6,6 +6,7 @@ import net.minestom.server.entity.Player;
 import net.minestom.server.event.EventDispatcher;
 import net.minestom.server.event.ListenerHandle;
 import net.minestom.server.event.player.PlayerPacketOutEvent;
+import net.minestom.server.event.player.SyncViewableSendPacketEvent;
 import net.minestom.server.extras.mojangAuth.MojangCrypt;
 import net.minestom.server.network.PacketProcessor;
 import net.minestom.server.network.packet.client.ClientPacket;
@@ -155,15 +156,28 @@ public class PlayerSocketConnection extends PlayerConnection {
     @Override
     public void sendPacket(@NotNull SendablePacket packet) {
         final boolean compressed = this.compressed;
-        this.workerQueue.relaxedOffer(() -> writePacketSync(packet, compressed));
+        SyncViewableSendPacketEvent event = new SyncViewableSendPacketEvent(this.getPlayer(), packet);
+        EventDispatcher.call(event);
+        if (event.isCancelled()) return;
+        this.workerQueue.relaxedOffer(() -> writePacketSync(event.getSentPacket(), compressed));
     }
 
     @Override
     public void sendPackets(@NotNull Collection<SendablePacket> packets) {
         final List<SendablePacket> packetsCopy = List.copyOf(packets);
         final boolean compressed = this.compressed;
+
+        List<SendablePacket> finalPackets = new ArrayList<>(packets.size());
+        for (SendablePacket packet : packetsCopy) {
+            SyncViewableSendPacketEvent event = new SyncViewableSendPacketEvent(this.getPlayer(), packet);
+            EventDispatcher.call(event);
+            if (!event.isCancelled()) {
+                finalPackets.add(event.getPacket());
+            }
+        }
+
         this.workerQueue.relaxedOffer(() -> {
-            for (SendablePacket packet : packetsCopy) writePacketSync(packet, compressed);
+            for (SendablePacket packet : finalPackets) writePacketSync(packet, compressed);
         });
     }
 
