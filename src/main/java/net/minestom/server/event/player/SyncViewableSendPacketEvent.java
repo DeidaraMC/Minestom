@@ -3,7 +3,6 @@ package net.minestom.server.event.player;
 import net.minestom.server.Viewable;
 import net.minestom.server.event.trait.CancellableEvent;
 import net.minestom.server.network.packet.server.SendablePacket;
-import net.minestom.server.network.packet.server.ServerPacket;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
@@ -29,7 +28,7 @@ public class SyncViewableSendPacketEvent implements CancellableEvent {
         return entity;
     }
 
-    public @NotNull SendablePacket getPacket() {
+    public @NotNull SendablePacket getOriginalPacket() {
         return packet;
     }
     public @NotNull SendablePacket getSentPacket() {

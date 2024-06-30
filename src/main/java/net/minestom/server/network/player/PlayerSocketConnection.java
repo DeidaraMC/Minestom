@@ -158,8 +158,9 @@ public class PlayerSocketConnection extends PlayerConnection {
         final boolean compressed = this.compressed;
         SyncViewableSendPacketEvent event = new SyncViewableSendPacketEvent(this.getPlayer(), packet);
         EventDispatcher.call(event);
+        final SendablePacket finalPacket = event.getSentPacket();
         if (event.isCancelled()) return;
-        this.workerQueue.relaxedOffer(() -> writePacketSync(event.getSentPacket(), compressed));
+        this.workerQueue.relaxedOffer(() -> writePacketSync(finalPacket, compressed));
     }
 
     @Override
@@ -172,7 +173,7 @@ public class PlayerSocketConnection extends PlayerConnection {
             SyncViewableSendPacketEvent event = new SyncViewableSendPacketEvent(this.getPlayer(), packet);
             EventDispatcher.call(event);
             if (!event.isCancelled()) {
-                finalPackets.add(event.getPacket());
+                finalPackets.add(event.getSentPacket());
             }
         }
 

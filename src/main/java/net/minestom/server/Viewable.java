@@ -64,10 +64,11 @@ public interface Viewable {
         SyncViewableSendPacketEvent event = new SyncViewableSendPacketEvent(this, packet);
         EventDispatcher.call(event);
         if (event.isCancelled()) return;
-        if (packet instanceof ServerPacket serverPacket) {
+        final SendablePacket finalPacket = event.getSentPacket();
+        if (finalPacket instanceof ServerPacket serverPacket) {
             PacketUtils.sendGroupedPacket(getViewers(), serverPacket);
         } else {
-            getViewers().forEach(player -> player.sendPacket(packet));
+            getViewers().forEach(player -> player.sendPacket(finalPacket));
         }
     }
 
