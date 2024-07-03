@@ -146,7 +146,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     private Component usernameComponent;
     protected final PlayerConnection playerConnection;
 
-    private int latency;
+    private volatile int latency;
     private Component displayName;
     private PlayerSkin skin;
 
@@ -456,7 +456,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
 
         // Eating animation
         if (isUsingItem()) {
-            if (instance.getWorldAge() - startItemUseTime >= itemUseTime && itemUseTime > 0) {
+            if (itemUseTime > 0 && getCurrentItemUseTime() >= itemUseTime) {
                 triggerStatus((byte) 9); // Mark item use as finished
                 ItemUpdateStateEvent itemUpdateStateEvent = callItemUpdateStateEvent(itemUseHand);
 
@@ -1166,6 +1166,16 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
      */
     public @Nullable Hand getItemUseHand() {
         return itemUseHand;
+    }
+
+    /**
+     * Gets the amount of ticks which have passed since the player started using an item.
+     *
+     * @return the amount of ticks which have passed, or zero if the player is not using an item
+     */
+    public long getCurrentItemUseTime() {
+        if (!isUsingItem()) return 0;
+        return getAliveTicks() - startItemUseTime;
     }
 
     @Override
@@ -2242,7 +2252,7 @@ public class Player extends LivingEntity implements CommandSender, Localizable, 
     public void refreshItemUse(@Nullable Hand itemUseHand, long itemUseTimeTicks) {
         this.itemUseHand = itemUseHand;
         if (itemUseHand != null) {
-            this.startItemUseTime = instance.getWorldAge();
+            this.startItemUseTime = getAliveTicks();
             this.itemUseTime = itemUseTimeTicks;
         } else {
             this.startItemUseTime = 0;
